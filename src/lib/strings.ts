@@ -32,12 +32,21 @@ export const taskStatusLabels: Record<TaskStatus | "pending" | "running", string
   simulated: "Simulated",
 };
 
-/** Where the app comes from, e.g. "winget", "Microsoft Store", "Flathub". */
+/** Where the app comes from, e.g. "winget", "Microsoft Store", "GitHub", "Flathub". */
 export function sourceLabel(app: CatalogApp): string | null {
   if (app.resolution.status !== "available") return null;
-  if (app.resolution.manager === "flatpak") return "Flathub";
-  const winget = app.packages.winget;
-  return typeof winget === "object" && winget.source === "msstore" ? "Microsoft Store" : "winget";
+  switch (app.resolution.manager) {
+    case "github":
+      return "GitHub release";
+    case "flatpak": {
+      const flatpak = app.packages.flatpak;
+      return typeof flatpak === "object" ? `Flatpak (${flatpak.remote.name})` : "Flathub";
+    }
+    case "winget": {
+      const winget = app.packages.winget;
+      return typeof winget === "object" && winget.source === "msstore" ? "Microsoft Store" : "winget";
+    }
+  }
 }
 
 export const text = {

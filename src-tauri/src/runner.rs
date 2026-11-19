@@ -12,14 +12,14 @@ use crate::catalog::Catalog;
 use crate::error::{Error, Result};
 use crate::exec::Cmd;
 use crate::platform::PlatformInfo;
-use crate::pm::{self, InstallOutcome, PmId};
+use crate::pm::{self, InstallAction, InstallOutcome, PmId, github};
 use crate::resolve::{Resolution, resolve};
 
 #[derive(Debug, Clone)]
 pub struct Task {
     pub id: String,
     pub label: String,
-    pub cmd: Cmd,
+    pub action: InstallAction,
     pub kind: TaskKind,
 }
 
@@ -80,7 +80,7 @@ pub fn plan_install(
     app_ids: &[String],
 ) -> Result<Vec<Task>> {
     let mut seen = HashSet::new();
-    let mut managers = Vec::new();
+    let mut setups: Vec<Task> = Vec::new();
     let mut installs = Vec::new();
 
     for id in app_ids {
@@ -93,28 +93,28 @@ pub fn plan_install(
         let Resolution::Available { manager, .. } = resolve(app, platform) else {
             return Err(Error::Unavailable(app.name.clone()));
         };
-        let cmd =
-            pm::install_cmd(manager, app).ok_or_else(|| Error::Unavailable(app.name.clone()))?;
-        if !managers.contains(&manager) {
-            managers.push(manager);
+        let action =
+            pm::install_action(manager, app).ok_or_else(|| Error::Unavailable(app.name.clone()))?;
+        for step in pm::setup_steps(manager, app) {
+            if !setups.iter().any(|task| task.id == step.id) {
+                setups.push(Task {
+                    id: step.id,
+                    label: step.label,
+                    action: InstallAction::Command(step.cmd),
+                    kind: TaskKind::Setup,
+                });
+            }
         }
         installs.push(Task {
             id: app.id.clone(),
             label: app.name.clone(),
-            cmd,
+            action,
             kind: TaskKind::Install(manager),
         });
     }
 
-    let setups = managers.into_iter().filter_map(|manager| {
-        pm::setup_step(manager).map(|step| Task {
-            id: format!("setup-{}", manager.as_str()),
-            label: step.label.to_string(),
-            cmd: step.cmd,
-            kind: TaskKind::Setup,
-        })
-    });
-    Ok(setups.chain(installs).collect())
+    setups.extend(installs);
+    Ok(setups)
 }
 
 pub fn run(tasks: &[Task], dry_run: bool, mut emit: impl FnMut(RunEvent)) -> RunSummary {
@@ -123,7 +123,7 @@ pub fn run(tasks: &[Task], dry_run: bool, mut emit: impl FnMut(RunEvent)) -> Run
         emit(RunEvent::TaskStarted {
             task_id: task.id.clone(),
             label: task.label.clone(),
-            command: task.cmd.display(),
+            command: task.action.display(),
         });
         let (status, exit_code) = if dry_run {
             (TaskStatus::Simulated, None)
@@ -146,14 +146,39 @@ pub fn run(tasks: &[Task], dry_run: bool, mut emit: impl FnMut(RunEvent)) -> Run
 }
 
 fn execute(task: &Task, emit: &mut impl FnMut(RunEvent)) -> (TaskStatus, Option<i32>) {
-    let mut child = match task.cmd.to_command().spawn() {
+    let output = |line: String| RunEvent::Output {
+        task_id: task.id.clone(),
+        line,
+    };
+    let code = match &task.action {
+        InstallAction::Command(cmd) => run_process(&task.id, cmd, emit),
+        InstallAction::GithubRelease(package) => {
+            // The downloaded file and its folder are deleted when `download` is dropped.
+            let download = match github::download(package, |line| emit(output(line))) {
+                Ok(download) => download,
+                Err(message) => {
+                    emit(output(message));
+                    return (TaskStatus::Failed, None);
+                }
+            };
+            let cmd = github::installer_cmd(package, &download.path);
+            emit(output(format!("Running {}", cmd.display())));
+            run_process(&task.id, &cmd, emit)
+        }
+    };
+    (status_for(task.kind, code), code)
+}
+
+/// Runs a process, streaming stdout and stderr as output events. `None` if it couldn't start.
+fn run_process(task_id: &str, cmd: &Cmd, emit: &mut impl FnMut(RunEvent)) -> Option<i32> {
+    let mut child = match cmd.to_command().spawn() {
         Ok(child) => child,
         Err(error) => {
             emit(RunEvent::Output {
-                task_id: task.id.clone(),
-                line: format!("Couldn't start {}: {error}", task.cmd.program),
+                task_id: task_id.to_string(),
+                line: format!("Couldn't start {}: {error}", cmd.program),
             });
-            return (TaskStatus::Failed, None);
+            return None;
         }
     };
 
@@ -183,7 +208,7 @@ fn execute(task: &Task, emit: &mut impl FnMut(RunEvent)) -> (TaskStatus, Option<
 
     for line in rx {
         emit(RunEvent::Output {
-            task_id: task.id.clone(),
+            task_id: task_id.to_string(),
             line,
         });
     }
@@ -191,8 +216,7 @@ fn execute(task: &Task, emit: &mut impl FnMut(RunEvent)) -> (TaskStatus, Option<
         let _ = reader.join();
     }
 
-    let code = child.wait().ok().and_then(|status| status.code());
-    (status_for(task.kind, code), code)
+    child.wait().ok().and_then(|status| status.code())
 }
 
 fn status_for(kind: TaskKind, code: Option<i32>) -> TaskStatus {
@@ -301,7 +325,7 @@ mod tests {
         )
         .unwrap();
         let task_ids: Vec<_> = tasks.iter().map(|t| t.id.as_str()).collect();
-        assert_eq!(task_ids, ["setup-flatpak", "spotify"]);
+        assert_eq!(task_ids, ["setup-flatpak-flathub", "spotify"]);
     }
 
     #[test]
@@ -323,7 +347,7 @@ mod tests {
         let tasks = vec![Task {
             id: "x".into(),
             label: "X".into(),
-            cmd: Cmd::new("program-that-does-not-exist").arg("--flag"),
+            action: InstallAction::Command(Cmd::new("program-that-does-not-exist").arg("--flag")),
             kind: TaskKind::Setup,
         }];
         let mut events = Vec::new();
@@ -354,13 +378,13 @@ mod tests {
             Task {
                 id: "ok".into(),
                 label: "cargo".into(),
-                cmd: Cmd::new("cargo").arg("--version"),
+                action: InstallAction::Command(Cmd::new("cargo").arg("--version")),
                 kind: TaskKind::Setup,
             },
             Task {
                 id: "missing".into(),
                 label: "missing".into(),
-                cmd: Cmd::new("program-that-does-not-exist"),
+                action: InstallAction::Command(Cmd::new("program-that-does-not-exist")),
                 kind: TaskKind::Setup,
             },
         ];

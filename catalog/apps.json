@@ -42,10 +42,10 @@
     },
     {
       "id": "python",
-      "name": "Python",
-      "description": "Python Install Manager (py) on Windows, python3 on Linux",
+      "name": "Python 3",
+      "description": "Python language and pip",
       "category": "dev",
-      "packages": { "winget": "Python.PythonInstallManager", "apt": "python3" },
+      "packages": { "winget": "Python.Python.3.14", "apt": "python3" },
       "targets": ["host", "wsl"],
       "preferLinux": "native"
     },
@@ -207,32 +207,22 @@
       "packages": { "winget": "Obsidian.Obsidian", "flatpak": "md.obsidian.Obsidian" }
     },
     {
-      "id": "artcraft-pdfcraft",
-      "name": "PdfCraft",
-      "description": "PDF editor (ArtCraft suite)",
+      "id": "artcraft-launcher",
+      "name": "ArtCraft Launcher",
+      "description": "Installs and updates the ArtCraft creative apps",
       "category": "productivity",
-      "packages": { "winget": "ArtCraft.PdfCraft" }
-    },
-    {
-      "id": "artcraft-wordcraft",
-      "name": "WordCraft",
-      "description": "Documents, .docx (ArtCraft suite)",
-      "category": "productivity",
-      "packages": { "winget": "ArtCraft.WordCraft" }
-    },
-    {
-      "id": "artcraft-deckcraft",
-      "name": "DeckCraft",
-      "description": "Presentations, .pptx (ArtCraft suite)",
-      "category": "productivity",
-      "packages": { "winget": "ArtCraft.DeckCraft" }
-    },
-    {
-      "id": "artcraft-gridcraft",
-      "name": "GridCraft",
-      "description": "Spreadsheets (ArtCraft suite)",
-      "category": "productivity",
-      "packages": { "winget": "ArtCraft.GridCraft" }
+      "packages": {
+        "github": {
+          "repo": "storytold/craft-launcher",
+          "assetSuffix": "-windows-{arch}.msi",
+          "installer": "msi",
+          "detectName": "ArtCraft Launcher"
+        },
+        "flatpak": {
+          "id": "ai.storyteller.artcraft-launcher",
+          "remote": { "name": "artcraft-oci", "url": "https://getartcraft.com/artcraft-oci.flatpakrepo" }
+        }
+      }
     },
     {
       "id": "claude",

@@ -26,16 +26,34 @@ fn unavailable(reason: &str) -> Resolution {
 
 pub fn resolve(app: &App, platform: &PlatformInfo) -> Resolution {
     match platform.os {
-        Os::Windows => match &app.packages.winget {
-            None => unavailable("Not available for Windows"),
-            Some(_) if !platform.has(PmId::Winget) => unavailable("winget wasn't found"),
-            Some(package) => Resolution::Available {
-                manager: PmId::Winget,
-                package: package.id().to_string(),
-            },
-        },
+        Os::Windows => resolve_windows(app, platform),
         Os::Linux => resolve_linux(app, platform),
         Os::Other => unavailable("This operating system isn't supported"),
+    }
+}
+
+/// winget first; GitHub releases for apps that winget doesn't have.
+fn resolve_windows(app: &App, platform: &PlatformInfo) -> Resolution {
+    if let Some(package) = &app.packages.winget
+        && platform.has(PmId::Winget)
+    {
+        return Resolution::Available {
+            manager: PmId::Winget,
+            package: package.id().to_string(),
+        };
+    }
+    if let Some(package) = &app.packages.github
+        && platform.has(PmId::Github)
+    {
+        return Resolution::Available {
+            manager: PmId::Github,
+            package: package.repo.clone(),
+        };
+    }
+    if app.packages.winget.is_some() {
+        unavailable("winget wasn't found")
+    } else {
+        unavailable("Not available for Windows")
     }
 }
 
@@ -43,9 +61,9 @@ pub fn resolve(app: &App, platform: &PlatformInfo) -> Resolution {
 fn resolve_linux(app: &App, platform: &PlatformInfo) -> Resolution {
     match &app.packages.flatpak {
         Some(_) if !platform.has(PmId::Flatpak) => unavailable("Flatpak isn't installed"),
-        Some(id) => Resolution::Available {
+        Some(package) => Resolution::Available {
             manager: PmId::Flatpak,
-            package: id.clone(),
+            package: package.id().to_string(),
         },
         None => unavailable("No supported package for this system yet"),
     }
@@ -118,6 +136,23 @@ mod tests {
             Resolution::Available {
                 manager: PmId::Flatpak,
                 package: "com.spotify.Client".into()
+            }
+        );
+    }
+
+    #[test]
+    fn windows_falls_back_to_github_releases() {
+        let github = r#"{ "github": { "repo": "owner/app", "assetSuffix": ".msi",
+            "installer": "msi", "detectName": "App" } }"#;
+        let resolution = resolve(
+            &app(github),
+            &platform(Os::Windows, &[PmId::Winget, PmId::Github]),
+        );
+        assert_eq!(
+            resolution,
+            Resolution::Available {
+                manager: PmId::Github,
+                package: "owner/app".into()
             }
         );
     }

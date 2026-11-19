@@ -1,7 +1,7 @@
 // Mirrors the structs exposed by the Rust backend (src-tauri/src). Keep in sync.
 
 export type Os = "windows" | "linux" | "other";
-export type PmId = "winget" | "flatpak";
+export type PmId = "winget" | "github" | "flatpak";
 export type Target = "host" | "wsl";
 export type WingetSource = "winget" | "msstore";
 export type Category =
@@ -32,9 +32,19 @@ export interface PlatformInfo {
 // catalog.rs
 export type WingetPackage = string | { id: string; source: WingetSource };
 
+export interface GithubPackage {
+  repo: string;
+  assetSuffix: string;
+  installer: "msi";
+  detectName: string;
+}
+
+export type FlatpakPackage = string | { id: string; remote: { name: string; url: string } };
+
 export interface Packages {
   winget?: WingetPackage;
-  flatpak?: string;
+  github?: GithubPackage;
+  flatpak?: FlatpakPackage;
   apt?: string;
 }
 

@@ -2,11 +2,12 @@
 //! the runner is the only place that executes installs.
 
 pub mod flatpak;
+pub mod github;
 pub mod winget;
 
 use serde::{Deserialize, Serialize};
 
-use crate::catalog::{App, WingetPackage};
+use crate::catalog::{App, GithubPackage, WingetPackage};
 use crate::error::Result;
 use crate::exec::Cmd;
 use crate::platform::Os;
@@ -15,16 +16,9 @@ use crate::platform::Os;
 #[serde(rename_all = "lowercase")]
 pub enum PmId {
     Winget,
+    /// Installers downloaded from GitHub releases (Windows).
+    Github,
     Flatpak,
-}
-
-impl PmId {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            PmId::Winget => "winget",
-            PmId::Flatpak => "flatpak",
-        }
-    }
 }
 
 /// What a finished install command means, according to the package manager.
@@ -35,48 +29,84 @@ pub enum InstallOutcome {
     Failed,
 }
 
-/// A one-time step a manager needs before installing (e.g. adding Flathub).
+/// How an app gets installed.
+#[derive(Debug, Clone)]
+pub enum InstallAction {
+    Command(Cmd),
+    GithubRelease(GithubPackage),
+}
+
+impl InstallAction {
+    pub fn display(&self) -> String {
+        match self {
+            Self::Command(cmd) => cmd.display(),
+            Self::GithubRelease(package) => github::describe(package),
+        }
+    }
+}
+
+/// A one-time step needed before installing (e.g. adding a Flatpak remote).
+/// Steps with the same `id` run only once per queue.
 pub struct SetupStep {
-    pub label: &'static str,
+    pub id: String,
+    pub label: String,
     pub cmd: Cmd,
 }
 
 pub fn detect_available(os: Os) -> Vec<PmId> {
-    let candidates: &[PmId] = match os {
-        Os::Windows => &[PmId::Winget],
-        Os::Linux => &[PmId::Flatpak],
-        Os::Other => &[],
-    };
-    candidates
-        .iter()
-        .copied()
-        .filter(|&manager| match manager {
-            PmId::Winget => winget::is_available(),
-            PmId::Flatpak => flatpak::is_available(),
-        })
-        .collect()
-}
-
-pub fn install_cmd(manager: PmId, app: &App) -> Option<Cmd> {
-    match manager {
-        PmId::Winget => app.packages.winget.as_ref().map(winget::install_cmd),
-        PmId::Flatpak => app.packages.flatpak.as_deref().map(flatpak::install_cmd),
+    match os {
+        Os::Windows => {
+            let mut managers = Vec::new();
+            if winget::is_available() {
+                managers.push(PmId::Winget);
+            }
+            // Only needs msiexec, which every Windows has.
+            managers.push(PmId::Github);
+            managers
+        }
+        Os::Linux if flatpak::is_available() => vec![PmId::Flatpak],
+        Os::Linux | Os::Other => Vec::new(),
     }
 }
 
-pub fn setup_step(manager: PmId) -> Option<SetupStep> {
+pub fn install_action(manager: PmId, app: &App) -> Option<InstallAction> {
     match manager {
-        PmId::Winget => None,
-        PmId::Flatpak => Some(SetupStep {
-            label: "Add the Flathub repository",
-            cmd: flatpak::add_flathub_cmd(),
-        }),
+        PmId::Winget => app
+            .packages
+            .winget
+            .as_ref()
+            .map(|package| InstallAction::Command(winget::install_cmd(package))),
+        PmId::Github => app
+            .packages
+            .github
+            .clone()
+            .map(InstallAction::GithubRelease),
+        PmId::Flatpak => app
+            .packages
+            .flatpak
+            .as_ref()
+            .map(|package| InstallAction::Command(flatpak::install_cmd(package))),
+    }
+}
+
+pub fn setup_steps(manager: PmId, app: &App) -> Vec<SetupStep> {
+    match (manager, &app.packages.flatpak) {
+        (PmId::Flatpak, Some(package)) => {
+            let (name, url) = flatpak::remote_of(package);
+            vec![SetupStep {
+                id: format!("setup-flatpak-{name}"),
+                label: format!("Add the {name} Flatpak repository"),
+                cmd: flatpak::add_remote_cmd(name, url),
+            }]
+        }
+        _ => Vec::new(),
     }
 }
 
 pub fn interpret_exit(manager: PmId, code: Option<i32>) -> InstallOutcome {
     match manager {
         PmId::Winget => winget::interpret_exit(code),
+        PmId::Github => github::interpret_exit(code),
         PmId::Flatpak => flatpak::interpret_exit(code),
     }
 }
@@ -91,6 +121,12 @@ pub fn installed_packages(manager: PmId, apps: &[&App]) -> Result<Vec<String>> {
                 .collect();
             winget::installed_among(&packages)
         }
+        PmId::Github => Ok(apps
+            .iter()
+            .filter_map(|app| app.packages.github.as_ref())
+            .filter(|package| github::is_installed(package))
+            .map(|package| package.repo.clone())
+            .collect()),
         PmId::Flatpak => flatpak::list_installed(),
     }
 }
