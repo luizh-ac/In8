@@ -1,0 +1,252 @@
+{
+  "version": 1,
+  "apps": [
+    {
+      "id": "chrome",
+      "name": "Google Chrome",
+      "description": "Web browser by Google",
+      "category": "browsers",
+      "packages": { "winget": "Google.Chrome", "flatpak": "com.google.Chrome" }
+    },
+    {
+      "id": "brave",
+      "name": "Brave",
+      "description": "Privacy-focused web browser",
+      "category": "browsers",
+      "packages": { "winget": "Brave.Brave", "flatpak": "com.brave.Browser" }
+    },
+    {
+      "id": "vscode",
+      "name": "Visual Studio Code",
+      "description": "Code editor",
+      "category": "dev",
+      "packages": { "winget": "Microsoft.VisualStudioCode", "flatpak": "com.visualstudio.code" }
+    },
+    {
+      "id": "git",
+      "name": "Git",
+      "description": "Version control",
+      "category": "dev",
+      "packages": { "winget": "Git.Git", "apt": "git" },
+      "targets": ["host", "wsl"],
+      "preferLinux": "native"
+    },
+    {
+      "id": "nodejs",
+      "name": "Node.js LTS",
+      "description": "JavaScript runtime",
+      "category": "dev",
+      "packages": { "winget": "OpenJS.NodeJS.LTS", "apt": "nodejs" },
+      "targets": ["host", "wsl"],
+      "preferLinux": "native"
+    },
+    {
+      "id": "python",
+      "name": "Python",
+      "description": "Python Install Manager (py) on Windows, python3 on Linux",
+      "category": "dev",
+      "packages": { "winget": "Python.PythonInstallManager", "apt": "python3" },
+      "targets": ["host", "wsl"],
+      "preferLinux": "native"
+    },
+    {
+      "id": "rust",
+      "name": "Rust (rustup)",
+      "description": "Rust toolchain installer",
+      "category": "dev",
+      "packages": { "winget": "Rustlang.Rustup", "apt": "rustup" },
+      "targets": ["host", "wsl"],
+      "preferLinux": "native"
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "description": "Voice and text chat",
+      "category": "communication",
+      "packages": { "winget": "Discord.Discord", "flatpak": "com.discordapp.Discord" }
+    },
+    {
+      "id": "whatsapp",
+      "name": "WhatsApp",
+      "description": "Messaging (Microsoft Store)",
+      "category": "communication",
+      "packages": { "winget": { "id": "9NKSQGP7F2NH", "source": "msstore" } }
+    },
+    {
+      "id": "whatsapp-beta",
+      "name": "WhatsApp Beta",
+      "description": "Messaging, beta channel (Microsoft Store)",
+      "category": "communication",
+      "packages": { "winget": { "id": "9NBDXK71NK08", "source": "msstore" } }
+    },
+    {
+      "id": "teams",
+      "name": "Microsoft Teams",
+      "description": "Work chat and meetings",
+      "category": "communication",
+      "packages": { "winget": "Microsoft.Teams" }
+    },
+    {
+      "id": "spotify",
+      "name": "Spotify",
+      "description": "Music streaming",
+      "category": "media",
+      "packages": { "winget": "Spotify.Spotify", "flatpak": "com.spotify.Client" }
+    },
+    {
+      "id": "youtube-music",
+      "name": "YouTube Music Desktop",
+      "description": "Unofficial YouTube Music client (YTMDesktop)",
+      "category": "media",
+      "packages": { "winget": "Ytmdesktop.Ytmdesktop", "flatpak": "app.ytmdesktop.ytmdesktop" }
+    },
+    {
+      "id": "stremio",
+      "name": "Stremio",
+      "description": "Media center (v5 on Windows)",
+      "category": "media",
+      "packages": { "winget": "Stremio.Stremio.Beta", "flatpak": "com.stremio.Stremio" }
+    },
+    {
+      "id": "netflix",
+      "name": "Netflix",
+      "description": "Video streaming (Microsoft Store)",
+      "category": "media",
+      "packages": { "winget": { "id": "9WZDNCRFJ3TJ", "source": "msstore" } }
+    },
+    {
+      "id": "prime-video",
+      "name": "Prime Video",
+      "description": "Video streaming (Microsoft Store)",
+      "category": "media",
+      "packages": { "winget": { "id": "9P6RC76MSMMJ", "source": "msstore" } }
+    },
+    {
+      "id": "7zip",
+      "name": "7-Zip",
+      "description": "File archiver",
+      "category": "utilities",
+      "packages": { "winget": "7zip.7zip", "apt": "7zip" },
+      "preferLinux": "native"
+    },
+    {
+      "id": "qbittorrent",
+      "name": "qBittorrent",
+      "description": "BitTorrent client",
+      "category": "utilities",
+      "packages": { "winget": "qBittorrent.qBittorrent", "flatpak": "org.qbittorrent.qBittorrent", "apt": "qbittorrent" }
+    },
+    {
+      "id": "steam",
+      "name": "Steam",
+      "description": "Game store and launcher",
+      "category": "gaming",
+      "packages": { "winget": "Valve.Steam", "flatpak": "com.valvesoftware.Steam" }
+    },
+    {
+      "id": "epic-games",
+      "name": "Epic Games Launcher",
+      "description": "Game store and launcher",
+      "category": "gaming",
+      "packages": { "winget": "EpicGames.EpicGamesLauncher" }
+    },
+    {
+      "id": "ea-app",
+      "name": "EA app",
+      "description": "Electronic Arts launcher",
+      "category": "gaming",
+      "packages": { "winget": "ElectronicArts.EADesktop" }
+    },
+    {
+      "id": "ubisoft-connect",
+      "name": "Ubisoft Connect",
+      "description": "Ubisoft launcher",
+      "category": "gaming",
+      "packages": { "winget": "Ubisoft.Connect" }
+    },
+    {
+      "id": "battlenet",
+      "name": "Battle.net",
+      "description": "Blizzard launcher",
+      "category": "gaming",
+      "packages": { "winget": "Blizzard.BattleNet" }
+    },
+    {
+      "id": "curseforge",
+      "name": "CurseForge",
+      "description": "Mod manager",
+      "category": "gaming",
+      "packages": { "winget": "Overwolf.CurseForge", "flatpak": "com.overwolf.curseforge" }
+    },
+    {
+      "id": "hydra",
+      "name": "Hydra Launcher",
+      "description": "Game launcher",
+      "category": "gaming",
+      "packages": { "winget": "HydraLauncher.Hydra" }
+    },
+    {
+      "id": "google-play-games",
+      "name": "Google Play Games",
+      "description": "Android games on PC",
+      "category": "gaming",
+      "packages": { "winget": "Google.PlayGames" }
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "description": "Notes and workspace",
+      "category": "productivity",
+      "packages": { "winget": "Notion.Notion" }
+    },
+    {
+      "id": "obsidian",
+      "name": "Obsidian",
+      "description": "Markdown notes",
+      "category": "productivity",
+      "packages": { "winget": "Obsidian.Obsidian", "flatpak": "md.obsidian.Obsidian" }
+    },
+    {
+      "id": "artcraft-pdfcraft",
+      "name": "PdfCraft",
+      "description": "PDF editor (ArtCraft suite)",
+      "category": "productivity",
+      "packages": { "winget": "ArtCraft.PdfCraft" }
+    },
+    {
+      "id": "artcraft-wordcraft",
+      "name": "WordCraft",
+      "description": "Documents, .docx (ArtCraft suite)",
+      "category": "productivity",
+      "packages": { "winget": "ArtCraft.WordCraft" }
+    },
+    {
+      "id": "artcraft-deckcraft",
+      "name": "DeckCraft",
+      "description": "Presentations, .pptx (ArtCraft suite)",
+      "category": "productivity",
+      "packages": { "winget": "ArtCraft.DeckCraft" }
+    },
+    {
+      "id": "artcraft-gridcraft",
+      "name": "GridCraft",
+      "description": "Spreadsheets (ArtCraft suite)",
+      "category": "productivity",
+      "packages": { "winget": "ArtCraft.GridCraft" }
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "description": "AI assistant desktop app",
+      "category": "productivity",
+      "packages": { "winget": "Anthropic.Claude" }
+    },
+    {
+      "id": "protonvpn",
+      "name": "Proton VPN",
+      "description": "VPN client",
+      "category": "security",
+      "packages": { "winget": "Proton.ProtonVPN", "flatpak": "com.protonvpn.www" }
+    }
+  ]
+}

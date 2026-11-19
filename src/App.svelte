@@ -1,53 +1,59 @@
 <script lang="ts">
-  import { getPlatform } from "./lib/api";
-  import type { PlatformInfo } from "./lib/types";
+  import Sidebar from "./lib/components/Sidebar.svelte";
+  import AppsView from "./lib/views/AppsView.svelte";
+  import RunView from "./lib/views/RunView.svelte";
+  import { store } from "./lib/store.svelte";
+  import { text } from "./lib/strings";
+  import { onMount } from "svelte";
 
-  const sections = ["Apps", "Profiles", "Debloat", "Tweaks", "Post-install", "Settings"];
-
-  let active = $state("Apps");
-  let platform = $state<PlatformInfo | null>(null);
-  let error = $state<string | null>(null);
-
-  $effect(() => {
-    getPlatform()
-      .then((info) => (platform = info))
-      .catch((e: unknown) => (error = String(e)));
+  onMount(() => {
+    store.load();
   });
+
+  const placeholderTitle = $derived(
+    store.view === "apps" || store.view === "run" ? "" : text.nav[store.view],
+  );
 </script>
 
 <div class="flex h-full bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
-  <aside class="flex w-56 flex-col border-r border-zinc-200 p-4 dark:border-zinc-800">
-    <div class="mb-6 px-2">
-      <h1 class="text-2xl font-semibold tracking-tight">In8</h1>
-      <p class="text-xs text-zinc-500">Your PC, ready from birth.</p>
-    </div>
-    <nav class="flex flex-col gap-1">
-      {#each sections as section (section)}
+  <Sidebar />
+
+  <div class="flex min-w-0 flex-1 flex-col">
+    <main class="flex-1 overflow-y-auto p-8">
+      {#if store.loadError}
+        <p class="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+          {store.loadError}
+        </p>
+      {:else if store.view === "apps"}
+        <AppsView />
+      {:else if store.view === "run"}
+        <RunView />
+      {:else}
+        <h2 class="text-xl font-semibold">{placeholderTitle}</h2>
+        <p class="mt-2 text-sm text-zinc-500">{text.comingSoon}</p>
+      {/if}
+    </main>
+
+    {#if store.view === "apps" && store.selected.size > 0}
+      <footer
+        class="flex items-center gap-4 border-t border-zinc-200 bg-white px-8 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <span class="text-sm">{text.bar.selected(store.selected.size)}</span>
         <button
           type="button"
-          class="rounded-md px-3 py-2 text-left text-sm transition-colors
-            {active === section
-            ? 'bg-zinc-200 font-medium dark:bg-zinc-800'
-            : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}"
-          onclick={() => (active = section)}
+          onclick={() => store.clearSelection()}
+          class="text-sm text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
         >
-          {section}
+          {text.bar.clear}
         </button>
-      {/each}
-    </nav>
-    <div class="mt-auto px-2 text-xs text-zinc-500">
-      {#if platform}
-        {platform.os} · {platform.arch} · v{platform.version}
-      {:else if error}
-        <span class="text-red-500">Backend error: {error}</span>
-      {:else}
-        Detecting platform…
-      {/if}
-    </div>
-  </aside>
-
-  <main class="flex-1 p-8">
-    <h2 class="text-xl font-semibold">{active}</h2>
-    <p class="mt-2 text-sm text-zinc-500">Coming soon.</p>
-  </main>
+        <button
+          type="button"
+          onclick={() => (store.view = "run")}
+          class="ml-auto rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+        >
+          {text.bar.review}
+        </button>
+      </footer>
+    {/if}
+  </div>
 </div>
