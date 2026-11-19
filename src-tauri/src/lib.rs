@@ -2,13 +2,15 @@ mod catalog;
 mod commands;
 mod error;
 mod exec;
+mod ini;
 mod platform;
 mod pm;
 mod resolve;
 mod runner;
+mod wsl;
 
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, RwLock};
 
 use tauri::Manager;
 
@@ -35,6 +37,7 @@ pub fn run() {
                 catalog: Arc::new(catalog),
                 platform: Arc::new(platform),
                 running: Arc::new(AtomicBool::new(false)),
+                wsl: RwLock::new(None),
             });
             Ok(())
         })
@@ -42,7 +45,14 @@ pub fn run() {
             commands::get_platform,
             commands::get_catalog,
             commands::get_installed,
-            commands::start_install,
+            commands::get_wsl_status,
+            commands::get_online_distros,
+            commands::get_wsl_installed,
+            commands::open_distro_terminal,
+            commands::get_wslconfig,
+            commands::preview_wslconfig,
+            commands::save_wslconfig,
+            commands::start_run,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the In8 application");

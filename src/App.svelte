@@ -2,6 +2,7 @@
   import Sidebar from "./lib/components/Sidebar.svelte";
   import AppsView from "./lib/views/AppsView.svelte";
   import RunView from "./lib/views/RunView.svelte";
+  import WslView from "./lib/views/WslView.svelte";
   import { store } from "./lib/store.svelte";
   import { text } from "./lib/strings";
   import { onMount } from "svelte";
@@ -13,6 +14,14 @@
   const placeholderTitle = $derived(
     store.view === "apps" || store.view === "run" ? "" : text.nav[store.view],
   );
+  const showBar = $derived(
+    (store.view === "apps" || store.view === "wsl") && store.selectionCount > 0,
+  );
+
+  function review(): void {
+    store.previousView = store.view;
+    store.view = "run";
+  }
 </script>
 
 <div class="flex h-full bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
@@ -26,6 +35,8 @@
         </p>
       {:else if store.view === "apps"}
         <AppsView />
+      {:else if store.view === "wsl"}
+        <WslView />
       {:else if store.view === "run"}
         <RunView />
       {:else}
@@ -34,11 +45,11 @@
       {/if}
     </main>
 
-    {#if store.view === "apps" && store.selected.size > 0}
+    {#if showBar}
       <footer
         class="flex items-center gap-4 border-t border-zinc-200 bg-white px-8 py-3 dark:border-zinc-800 dark:bg-zinc-900"
       >
-        <span class="text-sm">{text.bar.selected(store.selected.size)}</span>
+        <span class="text-sm">{text.bar.selected(store.selectionCount)}</span>
         <button
           type="button"
           onclick={() => store.clearSelection()}
@@ -48,7 +59,7 @@
         </button>
         <button
           type="button"
-          onclick={() => (store.view = "run")}
+          onclick={review}
           class="ml-auto rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
         >
           {text.bar.review}

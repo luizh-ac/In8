@@ -10,7 +10,9 @@
     const q = query.trim().toLowerCase();
     return store.catalog.filter(
       (app) =>
-        (!hideUnavailable || app.resolution.status === "available") &&
+        (!hideUnavailable ||
+          app.resolution.status === "available" ||
+          app.wslResolution?.status === "available") &&
         (q === "" || `${app.name} ${app.description} ${app.id}`.toLowerCase().includes(q)),
     );
   });
@@ -62,12 +64,7 @@
     </h3>
     <div class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-2">
       {#each group.apps as app (app.id)}
-        <AppCard
-          {app}
-          selected={store.selected.has(app.id)}
-          installed={store.installed.has(app.id)}
-          onToggle={() => store.toggle(app)}
-        />
+        <AppCard {app} />
       {/each}
     </div>
   </section>

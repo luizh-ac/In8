@@ -1,7 +1,7 @@
 // Mirrors the structs exposed by the Rust backend (src-tauri/src). Keep in sync.
 
 export type Os = "windows" | "linux" | "other";
-export type PmId = "winget" | "github" | "flatpak";
+export type PmId = "winget" | "github" | "flatpak" | "apt";
 export type Target = "host" | "wsl";
 export type WingetSource = "winget" | "msstore";
 export type Category =
@@ -63,6 +63,60 @@ export interface CatalogApp {
   targets: Target[];
   preferLinux: "flatpak" | "native";
   resolution: Resolution;
+  /** How the app installs inside WSL; null when it has no WSL target (or outside Windows). */
+  wslResolution: Resolution | null;
+}
+
+// wsl.rs
+export interface WslDistro {
+  name: string;
+  running: boolean;
+  version: number;
+  isDefault: boolean;
+}
+
+export interface DistroDetails {
+  name: string;
+  osName: string;
+  user: string;
+  hasUser: boolean;
+  systemd: boolean;
+  apt: boolean;
+  docker: boolean;
+}
+
+export interface WslStatus {
+  installed: boolean;
+  version: string | null;
+  distros: WslDistro[];
+  dockerDesktop: boolean;
+  active: DistroDetails | null;
+  /** null when VS Code isn't installed. */
+  vscodeExtension: boolean | null;
+}
+
+export interface OnlineDistro {
+  name: string;
+  friendlyName: string;
+}
+
+export interface WslConfig {
+  memory: string | null;
+  processors: number | null;
+  swap: string | null;
+}
+
+export type WslAction =
+  | { kind: "installWsl" }
+  | { kind: "installDistro"; distro: string }
+  | { kind: "enableSystemd" }
+  | { kind: "dockerEngine" }
+  | { kind: "vscodeExtension" };
+
+// runner.rs
+export interface RunRequest {
+  apps: { id: string; target: Target }[];
+  wsl: WslAction[];
 }
 
 // runner.rs

@@ -8,6 +8,8 @@ pub enum Error {
     UnknownApp(String),
     #[error("{0} isn't available on this system")]
     Unavailable(String),
+    #[error("WSL: {0}")]
+    Wsl(String),
     #[error("Another run is already in progress")]
     AlreadyRunning,
     #[error("Background task failed: {0}")]

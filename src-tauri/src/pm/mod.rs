@@ -1,6 +1,7 @@
 //! Package managers. Each one only builds commands and interprets results;
 //! the runner is the only place that executes installs.
 
+pub mod apt;
 pub mod flatpak;
 pub mod github;
 pub mod winget;
@@ -19,6 +20,8 @@ pub enum PmId {
     /// Installers downloaded from GitHub releases (Windows).
     Github,
     Flatpak,
+    /// Inside WSL distros for now; native Linux comes later.
+    Apt,
 }
 
 /// What a finished install command means, according to the package manager.
@@ -34,6 +37,8 @@ pub enum InstallOutcome {
 pub enum InstallAction {
     Command(Cmd),
     GithubRelease(GithubPackage),
+    /// `code --install-extension <id>`; VS Code is located when the task runs.
+    VscodeExtension(String),
 }
 
 impl InstallAction {
@@ -41,6 +46,7 @@ impl InstallAction {
         match self {
             Self::Command(cmd) => cmd.display(),
             Self::GithubRelease(package) => github::describe(package),
+            Self::VscodeExtension(extension) => format!("code --install-extension {extension}"),
         }
     }
 }
@@ -86,6 +92,11 @@ pub fn install_action(manager: PmId, app: &App) -> Option<InstallAction> {
             .flatpak
             .as_ref()
             .map(|package| InstallAction::Command(flatpak::install_cmd(package))),
+        PmId::Apt => app
+            .packages
+            .apt
+            .as_deref()
+            .map(|package| InstallAction::Command(apt::install_cmd(&[package]))),
     }
 }
 
@@ -108,6 +119,7 @@ pub fn interpret_exit(manager: PmId, code: Option<i32>) -> InstallOutcome {
         PmId::Winget => winget::interpret_exit(code),
         PmId::Github => github::interpret_exit(code),
         PmId::Flatpak => flatpak::interpret_exit(code),
+        PmId::Apt => apt::interpret_exit(code),
     }
 }
 
@@ -128,5 +140,14 @@ pub fn installed_packages(manager: PmId, apps: &[&App]) -> Result<Vec<String>> {
             .map(|package| package.repo.clone())
             .collect()),
         PmId::Flatpak => flatpak::list_installed(),
+        PmId::Apt => {
+            let packages: Vec<&str> = apps
+                .iter()
+                .filter_map(|app| app.packages.apt.as_deref())
+                .collect();
+            Ok(crate::exec::capture_stdout(&apt::query_cmd(&packages))
+                .map(|output| apt::parse_query(&output))
+                .unwrap_or_default())
+        }
     }
 }

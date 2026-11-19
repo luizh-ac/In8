@@ -1,7 +1,7 @@
 <script lang="ts">
   import { SvelteSet } from "svelte/reactivity";
   import { store, type TaskState } from "../store.svelte";
-  import { sourceLabel, taskStatusLabels, text } from "../strings";
+  import { sourceLabel, taskStatusLabels, text, wslActionLabel } from "../strings";
 
   const expanded = new SvelteSet<string>();
   const started = $derived(store.running || store.tasks.length > 0 || store.runError !== null);
@@ -28,7 +28,7 @@
   function backToApps(): void {
     if (store.running) return;
     store.resetRun();
-    store.view = "apps";
+    store.view = store.previousView;
   }
 </script>
 
@@ -45,17 +45,25 @@
 </div>
 
 {#if !started}
-  {#if store.selectedApps.length === 0}
+  {#if store.selectionCount === 0}
     <p class="mt-6 text-sm text-zinc-500">{text.run.empty}</p>
   {:else}
     <ul class="mt-6 divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
       {#each store.selectedApps as app (app.id)}
+        {@const target = store.targetOf(app)}
+        {@const resolution = store.resolutionFor(app)}
         <li class="flex items-center gap-3 px-4 py-2 text-sm">
           <span class="font-medium">{app.name}</span>
-          {#if app.resolution.status === "available"}
-            <span class="text-zinc-500">{app.resolution.package}</span>
+          {#if resolution?.status === "available"}
+            <span class="text-zinc-500">{resolution.package}</span>
           {/if}
-          <span class="ml-auto text-xs text-zinc-400">{sourceLabel(app)}</span>
+          <span class="ml-auto text-xs text-zinc-400">{sourceLabel(app, target)}</span>
+        </li>
+      {/each}
+      {#each store.pendingWslActions as action (action.kind)}
+        <li class="flex items-center gap-3 px-4 py-2 text-sm">
+          <span class="font-medium">{wslActionLabel(action)}</span>
+          <span class="ml-auto text-xs text-zinc-400">{text.targets.wsl}</span>
         </li>
       {/each}
     </ul>

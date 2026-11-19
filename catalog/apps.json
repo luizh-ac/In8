@@ -127,6 +127,7 @@
       "description": "File archiver",
       "category": "utilities",
       "packages": { "winget": "7zip.7zip", "apt": "7zip" },
+      "targets": ["host", "wsl"],
       "preferLinux": "native"
     },
     {

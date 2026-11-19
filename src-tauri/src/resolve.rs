@@ -2,9 +2,10 @@
 
 use serde::Serialize;
 
-use crate::catalog::App;
+use crate::catalog::{App, Target};
 use crate::platform::{Os, PlatformInfo};
 use crate::pm::PmId;
+use crate::wsl::DistroDetails;
 
 /// Mirrored in `src/lib/types.ts` (`Resolution`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -55,6 +56,27 @@ fn resolve_windows(app: &App, platform: &PlatformInfo) -> Resolution {
     } else {
         unavailable("Not available for Windows")
     }
+}
+
+/// How the app installs inside the WSL distro. `None` when the app doesn't offer a WSL target.
+pub fn resolve_wsl(app: &App, distro: Option<&DistroDetails>) -> Option<Resolution> {
+    if !app.targets.contains(&Target::Wsl) {
+        return None;
+    }
+    Some(match (distro, &app.packages.apt) {
+        (None, _) => unavailable("Set up a WSL distro first"),
+        (Some(distro), _) if !distro.has_user => {
+            unavailable("Create your Linux user in the WSL distro first")
+        }
+        (Some(distro), _) if !distro.apt => {
+            unavailable("Only apt-based distros (Ubuntu, Debian) are supported in WSL for now")
+        }
+        (Some(_), None) => unavailable("No apt package for this app"),
+        (Some(_), Some(package)) => Resolution::Available {
+            manager: PmId::Apt,
+            package: package.clone(),
+        },
+    })
 }
 
 /// Native managers (apt, dnf, pacman) come in a later phase; for now Linux installs use Flatpak.
@@ -155,6 +177,40 @@ mod tests {
                 package: "owner/app".into()
             }
         );
+    }
+
+    fn distro(has_user: bool, apt: bool) -> DistroDetails {
+        DistroDetails {
+            name: "Ubuntu".into(),
+            os_name: "Ubuntu 26.04 LTS".into(),
+            user: if has_user { "me".into() } else { "root".into() },
+            has_user,
+            systemd: true,
+            apt,
+            docker: false,
+        }
+    }
+
+    #[test]
+    fn wsl_target_uses_apt_in_a_ready_distro() {
+        let git = app(r#"{ "winget": "Git.Git", "apt": "git" }"#);
+        let mut git_wsl = git.clone();
+        git_wsl.targets = vec![Target::Host, Target::Wsl];
+
+        assert_eq!(resolve_wsl(&git, Some(&distro(true, true))), None);
+        assert_eq!(
+            resolve_wsl(&git_wsl, Some(&distro(true, true))),
+            Some(Resolution::Available {
+                manager: PmId::Apt,
+                package: "git".into()
+            })
+        );
+        for not_ready in [None, Some(distro(false, true)), Some(distro(true, false))] {
+            assert!(matches!(
+                resolve_wsl(&git_wsl, not_ready.as_ref()),
+                Some(Resolution::Unavailable { .. })
+            ));
+        }
     }
 
     #[test]

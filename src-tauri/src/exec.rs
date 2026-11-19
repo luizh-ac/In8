@@ -8,6 +8,10 @@ use serde::Serialize;
 pub struct Cmd {
     pub program: String,
     pub args: Vec<String>,
+    /// Extra environment variables for the process.
+    pub env: Vec<(String, String)>,
+    /// Text written to the process's stdin (e.g. file contents for `tee`).
+    pub input: Option<String>,
 }
 
 impl Cmd {
@@ -15,7 +19,19 @@ impl Cmd {
         Self {
             program: program.into(),
             args: Vec::new(),
+            env: Vec::new(),
+            input: None,
         }
+    }
+
+    pub fn env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.env.push((key.into(), value.into()));
+        self
+    }
+
+    pub fn input(mut self, input: impl Into<String>) -> Self {
+        self.input = Some(input.into());
+        self
     }
 
     pub fn arg(mut self, arg: impl Into<String>) -> Self {
@@ -41,12 +57,18 @@ impl Cmd {
             .join(" ")
     }
 
-    /// A process with stdin closed and stdout/stderr piped, without a console window on Windows.
+    /// A process with stdout/stderr piped and stdin piped only when there is input,
+    /// without a console window on Windows.
     pub fn to_command(&self) -> Command {
         let mut command = Command::new(&self.program);
         command
             .args(&self.args)
-            .stdin(Stdio::null())
+            .envs(self.env.iter().map(|(key, value)| (key, value)))
+            .stdin(if self.input.is_some() {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         hide_console_window(&mut command);
@@ -61,6 +83,12 @@ pub fn capture(cmd: &Cmd) -> Option<String> {
         .status
         .success()
         .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Runs a short command and returns its stdout whatever the exit code (`None` if it couldn't start).
+pub fn capture_stdout(cmd: &Cmd) -> Option<String> {
+    let output = cmd.to_command().output().ok()?;
+    Some(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 fn quote_for_display(part: &str) -> String {
