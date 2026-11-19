@@ -1,0 +1,14 @@
+# Normalize line endings to LF in the repository (works on Windows and Linux)
+* text=auto eol=lf
+
+# Windows scripts need CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+*.woff2 binary
