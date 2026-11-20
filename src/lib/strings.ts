@@ -51,6 +51,10 @@ export function sourceLabel(app: CatalogApp, target: Target = "host"): string | 
   switch (app.resolution.manager) {
     case "apt":
       return "apt";
+    case "dnf":
+      return "dnf";
+    case "pacman":
+      return "pacman";
     case "github":
       return "GitHub release";
     case "flatpak": {
@@ -101,6 +105,9 @@ export const text = {
     installed: "Installed",
     noResults: "No apps match your search.",
     noManagers: "No supported package manager was found on this system.",
+    noFlatpak: "Flatpak isn't installed, so apps that only come from Flathub are unavailable.",
+    installFlatpak: "Install Flatpak",
+    flatpakQueued: "Flatpak will be installed when you run. Flathub apps appear right after.",
   },
   wsl: {
     title: "WSL",
@@ -284,6 +291,9 @@ export const text = {
     wslDistro: "WSL distro",
     wslDistroHint: "In8 remembers the distro you pick in the WSL screen.",
     wslDistroDefault: "Windows default",
+    preferNative: "Prefer distro packages",
+    preferNativeHint:
+      "When an app comes both from Flathub and from your distro (apt, dnf or pacman), use the distro's package. Distro packages ask for your password once per run.",
     saved: "Saved.",
   },
   bar: {
@@ -314,5 +324,7 @@ export const text = {
     signOut: "Some changes show up fully after you sign out of Windows or restart.",
     groups: { debloat: "Remove", apps: "Install", tweaks: "Tweaks", postinstall: "Post-install" },
     revertLabel: (name: string) => `Revert: ${name}`,
+    setupFlatpak: "Install Flatpak and add Flathub",
+    askPassword: "Some items install from your distro, so In8 asks for your password once when they start.",
   },
 } as const;

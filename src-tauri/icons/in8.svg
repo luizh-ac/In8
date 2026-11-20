@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#bg)"/>
+  <!-- An "8" made of two rings: the top one slightly smaller, like the digit. -->
+  <circle cx="512" cy="368" r="132" fill="none" stroke="#ffffff" stroke-width="88"/>
+  <circle cx="512" cy="652" r="160" fill="none" stroke="#ffffff" stroke-width="88"/>
+</svg>

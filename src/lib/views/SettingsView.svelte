@@ -107,6 +107,21 @@
     </div>
   </div>
 
+  {#if store.platform?.os === "linux"}
+    <label class="flex items-start gap-3 px-4 py-4">
+      <input
+        type="checkbox"
+        checked={store.settings.linuxPreferNative}
+        onchange={(event) => update({ linuxPreferNative: event.currentTarget.checked })}
+        class="mt-1 accent-indigo-500"
+      />
+      <span>
+        <span class="block text-sm font-medium">{t.preferNative}</span>
+        <span class="block text-xs text-zinc-500">{t.preferNativeHint}</span>
+      </span>
+    </label>
+  {/if}
+
   {#if store.isWindows}
     <div class="flex items-center gap-4 px-4 py-4">
       <span>

@@ -1,7 +1,7 @@
 // Mirrors the structs exposed by the Rust backend (src-tauri/src). Keep in sync.
 
 export type Os = "windows" | "linux" | "other";
-export type PmId = "winget" | "github" | "flatpak" | "apt";
+export type PmId = "winget" | "github" | "flatpak" | "apt" | "dnf" | "pacman";
 export type Target = "host" | "wsl";
 export type WingetSource = "winget" | "msstore";
 export type Category =
@@ -27,6 +27,8 @@ export interface PlatformInfo {
   version: string;
   distro: Distro | null;
   managers: PmId[];
+  /** Linux: distro packages are tried before Flatpak. */
+  preferNative: boolean;
 }
 
 // catalog.rs
@@ -46,6 +48,8 @@ export interface Packages {
   github?: GithubPackage;
   flatpak?: FlatpakPackage;
   apt?: string;
+  dnf?: string;
+  pacman?: string;
 }
 
 // resolve.rs
@@ -133,6 +137,8 @@ export interface RunRequest {
   /** Debloat item IDs to remove. */
   debloat: string[];
   postinstall: PostInstallRequest[];
+  /** Linux: install Flatpak from the distro and add Flathub. */
+  setupFlatpak: boolean;
 }
 
 // runner.rs ("done": a setup step or tweak finished; "removed": a debloat item was uninstalled)
@@ -228,6 +234,8 @@ export interface Settings {
   dryRunByDefault: boolean;
   theme: Theme;
   wslDistro: string | null;
+  /** Linux: install from the distro's packages before Flatpak. */
+  linuxPreferNative: boolean;
 }
 
 // commands.rs

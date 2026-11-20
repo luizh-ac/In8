@@ -108,6 +108,11 @@ export function saveSettings(settings: Settings): Promise<Settings> {
   return invoke<Settings>("save_settings", { settings });
 }
 
+/** Detects the package managers again (after installing Flatpak or changing the Linux preference). */
+export function refreshPlatform(): Promise<PlatformInfo> {
+  return invoke<PlatformInfo>("refresh_platform");
+}
+
 export function getAdminStatus(): Promise<AdminStatus> {
   return invoke<AdminStatus>("get_admin_status");
 }

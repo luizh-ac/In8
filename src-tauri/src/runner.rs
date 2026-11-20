@@ -15,6 +15,7 @@ use crate::exec::Cmd;
 use crate::platform::{Os, PlatformInfo};
 use crate::pm::{self, InstallAction, InstallOutcome, PmId, apt, github};
 use crate::resolve::{Resolution, resolve, resolve_wsl};
+use crate::root::RootSession;
 use crate::tweaks::{self, TweakCatalog, TweakJob, TweakState};
 use crate::wsl::{self, DistroDetails, WslAction};
 
@@ -96,6 +97,9 @@ pub struct RunRequest {
     /// Debloat item IDs to remove.
     #[serde(default)]
     pub debloat: Vec<String>,
+    /// Linux: install Flatpak with the distro's package manager and add Flathub.
+    #[serde(default)]
+    pub setup_flatpak: bool,
     #[serde(default)]
     pub postinstall: Vec<crate::postinstall::PostInstallRequest>,
 }
@@ -162,7 +166,13 @@ pub fn plan(
             pm::install_action(manager, app).ok_or_else(|| Error::Unavailable(app.name.clone()))?;
         for step in pm::setup_steps(manager, app) {
             if !host_setups.iter().any(|task| task.id == step.id) {
-                host_setups.push(setup_task(step.id, step.label, step.cmd));
+                let mut task = setup_task(step.id, step.label, step.cmd);
+                if step.root
+                    && let InstallAction::Command(cmd) = task.action
+                {
+                    task.action = InstallAction::Root(cmd);
+                }
+                host_setups.push(task);
             }
         }
         host_installs.push(Task {
@@ -173,9 +183,51 @@ pub fn plan(
         });
     }
 
-    let mut tasks = host_setups;
+    let mut tasks = plan_flatpak_setup(platform, request.setup_flatpak)?;
+    tasks.extend(host_setups);
     tasks.extend(host_installs);
     tasks.extend(plan_wsl(platform, distro, &wsl_apps, &request.wsl)?);
+    // Setup steps shared by several parts (e.g. the apt update) run once, where they first appear.
+    let mut ids = HashSet::new();
+    tasks.retain(|task| ids.insert(task.id.clone()));
+    Ok(tasks)
+}
+
+/// Linux without Flatpak: install it from the distro and add Flathub for the user. Apps from Flathub
+/// show up after this run, once In8 detects Flatpak again.
+fn plan_flatpak_setup(platform: &PlatformInfo, wanted: bool) -> Result<Vec<Task>> {
+    if !wanted || platform.has(PmId::Flatpak) {
+        return Ok(Vec::new());
+    }
+    let manager = platform
+        .native_manager()
+        .filter(|_| platform.os == Os::Linux)
+        .ok_or_else(|| Error::Unavailable("Flatpak".into()))?;
+    let mut tasks = Vec::new();
+    let install = match manager {
+        PmId::Apt => {
+            tasks.push(Task {
+                id: "setup-apt-update".into(),
+                label: "Update package lists".into(),
+                action: InstallAction::Root(apt::native_update_cmd()),
+                kind: TaskKind::Setup,
+            });
+            apt::native_install_cmd(&["flatpak"])
+        }
+        PmId::Dnf => pm::dnf::install_cmd(&["flatpak"]),
+        _ => pm::pacman::install_cmd(&["flatpak"]),
+    };
+    tasks.push(Task {
+        id: "setup-flatpak".into(),
+        label: "Install Flatpak".into(),
+        action: InstallAction::Root(install),
+        kind: TaskKind::Install(manager),
+    });
+    tasks.push(setup_task(
+        format!("setup-flatpak-{}", pm::flatpak::FLATHUB_NAME),
+        "Add the Flathub repository",
+        pm::flatpak::add_remote_cmd(pm::flatpak::FLATHUB_NAME, pm::flatpak::FLATHUB_REPO),
+    ));
     Ok(tasks)
 }
 
@@ -375,8 +427,17 @@ fn plan_wsl(
     Ok(tasks)
 }
 
+/// Root on native Linux: the pkexec helper starts on the first task that needs it and lasts the run.
+enum RootState {
+    NotStarted,
+    Running(RootSession),
+    /// The password was refused or pkexec is missing; later root tasks fail without asking again.
+    Failed(String),
+}
+
 pub fn run(tasks: &[Task], dry_run: bool, mut emit: impl FnMut(RunEvent)) -> RunSummary {
     let (mut succeeded, mut failed) = (0, 0);
+    let mut root = RootState::NotStarted;
     for task in tasks {
         emit(RunEvent::TaskStarted {
             task_id: task.id.clone(),
@@ -386,7 +447,7 @@ pub fn run(tasks: &[Task], dry_run: bool, mut emit: impl FnMut(RunEvent)) -> Run
         let (status, exit_code) = if dry_run {
             (TaskStatus::Simulated, None)
         } else {
-            execute(task, &mut emit)
+            execute(task, &mut root, &mut emit)
         };
         if status == TaskStatus::Failed {
             failed += 1;
@@ -403,7 +464,11 @@ pub fn run(tasks: &[Task], dry_run: bool, mut emit: impl FnMut(RunEvent)) -> Run
     RunSummary { succeeded, failed }
 }
 
-fn execute(task: &Task, emit: &mut impl FnMut(RunEvent)) -> (TaskStatus, Option<i32>) {
+fn execute(
+    task: &Task,
+    root: &mut RootState,
+    emit: &mut impl FnMut(RunEvent),
+) -> (TaskStatus, Option<i32>) {
     let output = |line: String| RunEvent::Output {
         task_id: task.id.clone(),
         line,
@@ -466,6 +531,26 @@ fn execute(task: &Task, emit: &mut impl FnMut(RunEvent)) -> (TaskStatus, Option<
                     ));
                     return (TaskStatus::Failed, None);
                 }
+            }
+        }
+        InstallAction::Root(cmd) => {
+            if matches!(root, RootState::NotStarted) {
+                emit(output("Asking for the administrator password…".into()));
+                *root = match RootSession::start() {
+                    Ok(session) => RootState::Running(session),
+                    Err(message) => RootState::Failed(message),
+                };
+            }
+            match root {
+                RootState::Running(session) => {
+                    let mut log = |line: String| emit(output(line));
+                    session.run(cmd, &mut log)
+                }
+                RootState::Failed(message) => {
+                    emit(output(message.clone()));
+                    return (TaskStatus::Failed, None);
+                }
+                RootState::NotStarted => return (TaskStatus::Failed, None),
             }
         }
         InstallAction::HostTool(cmd) => {
@@ -632,6 +717,7 @@ mod tests {
             version: "0.0.0",
             distro: None,
             managers: managers.to_vec(),
+            prefer_native: false,
         }
     }
 
@@ -784,6 +870,51 @@ mod tests {
             Err(Error::Wsl(_))
         ));
         assert!(plan(&catalog, &windows(), Some(&ubuntu(true)), &docker).is_ok());
+    }
+
+    #[test]
+    fn native_linux_installs_run_as_root_after_one_package_list_update() {
+        let catalog = Catalog::load_embedded().unwrap();
+        let ubuntu = platform(Os::Linux, &[PmId::Apt]);
+        let tasks = plan(
+            &catalog,
+            &ubuntu,
+            None,
+            &RunRequest {
+                setup_flatpak: true,
+                ..apps(&[("git", Target::Host), ("python", Target::Host)])
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            task_ids(&tasks),
+            [
+                "setup-apt-update",
+                "setup-flatpak",
+                "setup-flatpak-flathub",
+                "git",
+                "python"
+            ]
+        );
+        assert!(matches!(tasks[0].action, InstallAction::Root(_)));
+        assert!(matches!(tasks[2].action, InstallAction::Command(_)));
+        let InstallAction::Root(cmd) = &tasks[3].action else {
+            panic!("git should install as root")
+        };
+        assert_eq!(cmd.program, "apt-get");
+        assert_eq!(cmd.args, ["install", "-y", "git"]);
+
+        // With Flatpak already there, asking to set it up does nothing.
+        let with_flatpak = platform(Os::Linux, &[PmId::Flatpak, PmId::Apt]);
+        let request = RunRequest {
+            setup_flatpak: true,
+            ..Default::default()
+        };
+        assert!(
+            plan(&catalog, &with_flatpak, None, &request)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

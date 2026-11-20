@@ -27,7 +27,8 @@ use crate::wsl::{self, DistroDetails, OnlineDistro, WslConfig, WslStatus};
 
 pub struct AppState {
     pub catalog: Arc<Catalog>,
-    pub platform: Arc<PlatformInfo>,
+    /// Re-detected after runs on Linux (installing Flatpak adds a manager) and when settings change.
+    pub platform: RwLock<Arc<PlatformInfo>>,
     pub running: Arc<AtomicBool>,
     /// The WSL distro In8 works with, from the last `get_wsl_status`.
     pub wsl: RwLock<Option<DistroDetails>>,
@@ -69,6 +70,15 @@ impl ProfileState {
 }
 
 impl AppState {
+    fn platform(&self) -> Arc<PlatformInfo> {
+        Arc::clone(
+            &self
+                .platform
+                .read()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        )
+    }
+
     fn wsl_distro(&self) -> Option<DistroDetails> {
         self.wsl
             .read()
@@ -96,20 +106,21 @@ async fn blocking<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) 
 
 #[tauri::command]
 pub fn get_platform(state: State<'_, AppState>) -> PlatformInfo {
-    (*state.platform).clone()
+    (*state.platform()).clone()
 }
 
 #[tauri::command]
 pub fn get_catalog(state: State<'_, AppState>) -> Vec<CatalogEntry> {
     let distro = state.wsl_distro();
-    let windows = state.platform.os == Os::Windows;
+    let platform = state.platform();
+    let windows = platform.os == Os::Windows;
     state
         .catalog
         .apps
         .iter()
         .map(|app| CatalogEntry {
             app: app.clone(),
-            resolution: resolve(app, &state.platform),
+            resolution: resolve(app, &platform),
             wsl_resolution: windows.then(|| resolve_wsl(app, distro.as_ref())).flatten(),
         })
         .collect()
@@ -122,7 +133,7 @@ pub async fn get_wsl_status(
     state: State<'_, AppState>,
     distro: Option<String>,
 ) -> Result<Option<WslStatus>> {
-    if state.platform.os != Os::Windows {
+    if state.platform().os != Os::Windows {
         return Ok(None);
     }
     let status = blocking(move || wsl::status(distro.as_deref())).await?;
@@ -195,7 +206,7 @@ pub async fn save_wslconfig(config: WslConfig) -> Result<()> {
 #[tauri::command]
 pub async fn get_installed(state: State<'_, AppState>) -> Result<Vec<String>> {
     let catalog = Arc::clone(&state.catalog);
-    let platform = Arc::clone(&state.platform);
+    let platform = state.platform();
     blocking(move || installed_app_ids(&catalog, &platform)).await?
 }
 
@@ -211,7 +222,7 @@ pub async fn start_run(
     }
     let running = Arc::clone(&state.running);
     let catalog = Arc::clone(&state.catalog);
-    let platform = Arc::clone(&state.platform);
+    let platform = state.platform();
     let distro = state.wsl_distro();
     let tweak_catalog = Arc::clone(&state.tweaks);
     let debloat_catalog = Arc::clone(&state.debloat);
@@ -263,7 +274,7 @@ pub struct PostInstallInfo {
 #[tauri::command]
 pub async fn get_postinstall(state: State<'_, AppState>) -> Result<PostInstallInfo> {
     let catalog = Arc::clone(&state.postinstall);
-    let platform = Arc::clone(&state.platform);
+    let platform = state.platform();
     let distro = state.wsl_distro();
     blocking(move || PostInstallInfo {
         tasks: catalog.tasks.clone(),
@@ -276,7 +287,7 @@ pub async fn get_postinstall(state: State<'_, AppState>) -> Result<PostInstallIn
 #[tauri::command]
 pub async fn get_tweaks(state: State<'_, AppState>) -> Result<Vec<TweakInfo>> {
     let catalog = Arc::clone(&state.tweaks);
-    let platform = Arc::clone(&state.platform);
+    let platform = state.platform();
     let tweak_state = Arc::clone(&state.tweak_state);
     blocking(move || tweaks::list(&catalog, &platform, &tweak_state)).await
 }
@@ -285,7 +296,7 @@ pub async fn get_tweaks(state: State<'_, AppState>) -> Result<Vec<TweakInfo>> {
 #[tauri::command]
 pub async fn get_debloat(state: State<'_, AppState>) -> Result<Vec<DebloatInfo>> {
     let catalog = Arc::clone(&state.debloat);
-    let platform = Arc::clone(&state.platform);
+    let platform = state.platform();
     blocking(move || debloat::list(&catalog, &platform)).await?
 }
 
@@ -305,6 +316,19 @@ pub fn save_settings(state: State<'_, AppState>, settings: Settings) -> Result<S
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .save(&settings)
+}
+
+/// Detects the package managers again (after installing Flatpak, or a settings change) and returns
+/// the platform. The frontend reloads the catalog afterwards.
+#[tauri::command]
+pub async fn refresh_platform(state: State<'_, AppState>) -> Result<PlatformInfo> {
+    let prefer_native = get_settings(state.clone()).linux_prefer_native;
+    let platform = blocking(move || PlatformInfo::detect_with(prefer_native)).await?;
+    *state
+        .platform
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Arc::new(platform.clone());
+    Ok(platform)
 }
 
 #[tauri::command]

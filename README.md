@@ -2,22 +2,22 @@
 
 *Pronounced like "innate" — your PC, ready from birth.*
 
-> Work in progress — currently in the planning phase.
+A desktop app for Windows and Linux that gets a freshly formatted PC ready in one go: install your everyday apps,
+remove bloatware, apply system tweaks and run post-install setup. Inspired by [Ninite](https://ninite.com), with
+profiles, reversible tweaks and an editable catalog.
 
-A cross-platform desktop app (Windows + Linux) that gets a freshly formatted PC ready to use in one go:
-install your everyday apps, remove bloatware, apply system tweaks and run post-install configuration.
-Inspired by [Ninite](https://ninite.com), with profiles, reversible tweaks and an editable catalog.
+## Features
 
-## Features (planned)
-
-- **Apps** — pick from a curated catalog and install everything in one run
-  (winget on Windows; Flatpak first with apt/dnf/pacman fallback on Linux, so it works on any distro).
-- **Profiles** — one click selects a whole set of apps and tweaks (e.g. Development, Gaming).
+- **Apps** — pick from a curated catalog and install everything in one run: winget (and verified GitHub releases)
+  on Windows; Flatpak first with apt, dnf or pacman on Linux, asking for your password once per run.
+- **WSL** — keep languages and dev tools inside Linux on Windows: install WSL and a distro, turn on systemd,
+  Docker Engine without Docker Desktop, VS Code connected to WSL, `.wslconfig`.
+- **Profiles** — one click selects a whole set (My setup, Essentials, Dev on WSL, Gaming, Media & chat), or save your own.
 - **Debloat** — remove preinstalled Windows apps you don't use.
-- **Tweaks** — dark mode, file extensions, Explorer and desktop settings, all reversible.
-- **Post-install** — configure Git, create folders, clone dotfiles, install VS Code extensions.
+- **Tweaks** — dark mode, Explorer, taskbar, privacy and performance settings; every one can be reverted.
+- **Post-install** — Git name and email, SSH key, VS Code extensions, toolchains, projects folder, dotfiles.
 - **Dry run** — preview every command before anything touches your system.
-- **Export / import** — save your selection and reuse it on another machine.
+- **Backup** — export your selection and saved profiles to a file and import it after formatting.
 
 ## Tech stack
 
@@ -29,9 +29,12 @@ Requirements: Rust, Node.js LTS and the [Tauri prerequisites](https://tauri.app/
 
 ```bash
 npm install
-npm run tauri dev     # run in development
-npm run tauri build   # build for the current OS (.exe on Windows, AppImage/.deb on Linux)
+npm run tauri dev            # run in development
+npm run tauri build          # Windows: NSIS installer in src-tauri/target/release/bundle/nsis/
+bash scripts/build-linux.sh  # Linux (or WSL): AppImage and .deb in src-tauri/target/linux-bundle/
 ```
+
+`scripts/sandbox.ps1` opens a release build in Windows Sandbox, to try tweaks and debloat without touching your PC.
 
 ## License
 

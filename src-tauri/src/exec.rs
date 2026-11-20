@@ -105,7 +105,7 @@ impl Cmd {
 /// Finds a program that may have been installed after In8 started (its PATH is from that moment):
 /// the PATH first, then the folders its Windows installer uses. Falls back to the bare name.
 pub fn locate(program: &str) -> String {
-    if on_path(program) {
+    if is_on_path(program) {
         return program.to_string();
     }
     known_locations(program)
@@ -117,7 +117,7 @@ pub fn locate(program: &str) -> String {
         )
 }
 
-fn on_path(program: &str) -> bool {
+pub fn is_on_path(program: &str) -> bool {
     let names: Vec<String> = if cfg!(windows) {
         vec![format!("{program}.exe"), format!("{program}.cmd")]
     } else {

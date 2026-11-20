@@ -7,6 +7,7 @@ pub fn is_elevated() -> bool {
 }
 
 /// Outcome of asking Windows to start an elevated copy of In8.
+#[cfg_attr(not(windows), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Relaunch {
     /// The elevated copy started; this one should exit.

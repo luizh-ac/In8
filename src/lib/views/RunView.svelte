@@ -7,6 +7,15 @@
   const started = $derived(store.running || store.tasks.length > 0 || store.runError !== null);
   const advancedDebloat = $derived(store.selectedDebloat.filter((item) => item.level === "advanced"));
   let confirmedAdvanced = $state(false);
+  /** Native Linux installs go through pkexec: one password prompt for the run. */
+  const asksPassword = $derived(
+    store.platform?.os === "linux" &&
+      (store.setupFlatpak ||
+        store.selectedApps.some((app) => {
+          const resolution = store.resolutionFor(app);
+          return resolution?.status === "available" && ["apt", "dnf", "pacman"].includes(resolution.manager);
+        })),
+  );
   const postItems = $derived(
     [...store.postSelected].map((key) => {
       const [id, target] = key.split("@");
@@ -101,7 +110,18 @@
       </div>
     {/if}
 
+    {#if asksPassword}
+      <p class="mt-6 rounded-md bg-zinc-100 p-3 text-sm text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+        {text.run.askPassword}
+      </p>
+    {/if}
+
     <ul class="mt-6 divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+      {#if store.setupFlatpak}
+        <li class="flex items-center gap-3 px-4 py-2 text-sm">
+          <span class="font-medium">{text.run.setupFlatpak}</span>
+        </li>
+      {/if}
       {#each store.selectedDebloat as item (item.id)}
         <li class="flex items-center gap-3 px-4 py-2 text-sm">
           <span class="font-medium">{text.run.groups.debloat}: {item.name}</span>

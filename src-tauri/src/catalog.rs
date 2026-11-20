@@ -53,6 +53,12 @@ pub struct Packages {
     pub flatpak: Option<FlatpakPackage>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub apt: Option<String>,
+    /// Fedora and other RPM distros.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dnf: Option<String>,
+    /// Arch and derivatives.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pacman: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -163,6 +169,18 @@ impl Packages {
             .chain(self.github.as_ref().map(|github| github.repo.as_str()))
             .chain(self.flatpak.as_ref().map(FlatpakPackage::id))
             .chain(self.apt.as_deref())
+            .chain(self.dnf.as_deref())
+            .chain(self.pacman.as_deref())
+    }
+
+    /// The native Linux package for this manager, if the app has one.
+    pub fn native(&self, manager: crate::pm::PmId) -> Option<&str> {
+        match manager {
+            crate::pm::PmId::Apt => self.apt.as_deref(),
+            crate::pm::PmId::Dnf => self.dnf.as_deref(),
+            crate::pm::PmId::Pacman => self.pacman.as_deref(),
+            _ => None,
+        }
     }
 }
 

@@ -757,6 +757,7 @@ mod tests {
             version: "test",
             distro: None,
             managers: Vec::new(),
+            prefer_native: false,
         }
     }
 

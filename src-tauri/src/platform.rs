@@ -39,10 +39,17 @@ pub struct PlatformInfo {
     pub version: &'static str,
     pub distro: Option<Distro>,
     pub managers: Vec<PmId>,
+    /// Linux: try the distro's packages before Flatpak (setting "Prefer distro packages").
+    pub prefer_native: bool,
 }
 
 impl PlatformInfo {
+    #[cfg(test)]
     pub fn detect() -> Self {
+        Self::detect_with(false)
+    }
+
+    pub fn detect_with(prefer_native: bool) -> Self {
         let os = Os::current();
         let distro = match os {
             Os::Linux => std::fs::read_to_string("/etc/os-release")
@@ -56,11 +63,20 @@ impl PlatformInfo {
             version: env!("CARGO_PKG_VERSION"),
             distro,
             managers: pm::detect_available(os),
+            prefer_native,
         }
     }
 
     pub fn has(&self, manager: PmId) -> bool {
         self.managers.contains(&manager)
+    }
+
+    /// The distro's own package manager (apt, dnf or pacman) on native Linux.
+    pub fn native_manager(&self) -> Option<PmId> {
+        self.managers
+            .iter()
+            .copied()
+            .find(|manager| manager.is_native())
     }
 }
 

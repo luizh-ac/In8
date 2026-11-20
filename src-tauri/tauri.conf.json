@@ -30,13 +30,27 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "deb", "appimage"],
+    "publisher": "In8",
+    "category": "Utility",
+    "shortDescription": "Get a freshly formatted PC ready",
+    "longDescription": "Installs your apps, removes bloatware, applies tweaks and runs post-install setup on Windows and Linux, with profiles and backups.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": ["pkexec | policykit-1"]
+      }
+    }
   }
 }

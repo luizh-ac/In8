@@ -20,6 +20,8 @@ pub struct Settings {
     pub theme: Theme,
     /// The WSL distro In8 works with; `None` uses the default distro.
     pub wsl_distro: Option<String>,
+    /// Linux: install from the distro's packages before Flatpak when an app has both.
+    pub linux_prefer_native: bool,
 }
 
 impl Default for Settings {
@@ -29,6 +31,7 @@ impl Default for Settings {
             dry_run_by_default: true,
             theme: Theme::System,
             wsl_distro: None,
+            linux_prefer_native: false,
         }
     }
 }
@@ -121,6 +124,7 @@ mod tests {
             dry_run_by_default: false,
             theme: Theme::Dark,
             wsl_distro: Some("Ubuntu-24.04".into()),
+            linux_prefer_native: true,
         };
         assert_eq!(store.save(&settings).unwrap(), settings);
         assert_eq!(store.load(), settings);

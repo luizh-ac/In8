@@ -2,8 +2,10 @@
 //! the runner is the only place that executes installs.
 
 pub mod apt;
+pub mod dnf;
 pub mod flatpak;
 pub mod github;
+pub mod pacman;
 pub mod winget;
 
 use serde::{Deserialize, Serialize};
@@ -20,8 +22,31 @@ pub enum PmId {
     /// Installers downloaded from GitHub releases (Windows).
     Github,
     Flatpak,
-    /// Inside WSL distros for now; native Linux comes later.
+    /// Debian/Ubuntu: inside WSL distros (as root through wsl.exe) and on native Linux (through pkexec).
     Apt,
+    /// Fedora and other RPM distros (native Linux, through pkexec).
+    Dnf,
+    /// Arch and derivatives (native Linux, through pkexec).
+    Pacman,
+}
+
+impl PmId {
+    /// apt, dnf and pacman: the distro's own package managers, which need root.
+    pub fn is_native(self) -> bool {
+        matches!(self, Self::Apt | Self::Dnf | Self::Pacman)
+    }
+}
+
+/// The distro's package manager on native Linux: the first one found on the PATH.
+pub fn detect_native() -> Option<PmId> {
+    [
+        ("apt-get", PmId::Apt),
+        ("dnf", PmId::Dnf),
+        ("pacman", PmId::Pacman),
+    ]
+    .into_iter()
+    .find(|(program, _)| crate::exec::is_on_path(program))
+    .map(|(_, manager)| manager)
 }
 
 /// What a finished install command means, according to the package manager.
@@ -48,6 +73,8 @@ pub enum InstallAction {
     CreateDir(std::path::PathBuf),
     /// `ssh-keygen` in a terminal window, unless the key already exists.
     SshKey(crate::postinstall::SshKeyJob),
+    /// A command that needs root on native Linux; it runs through the pkexec helper (one password per run).
+    Root(Cmd),
     /// `code --install-extension` run inside WSL, so the extension lands on the WSL side.
     VscodeWslExtension {
         distro: String,
@@ -63,6 +90,7 @@ impl InstallAction {
             Self::GithubRelease(package) => github::describe(package),
             Self::VscodeExtension(extension) => format!("code --install-extension {extension}"),
             Self::HostTool(cmd) => cmd.display(),
+            Self::Root(cmd) => format!("(as administrator) {}", cmd.display()),
             Self::CreateDir(path) => crate::postinstall::describe_dir(path),
             Self::SshKey(job) => crate::postinstall::describe_ssh(job),
             Self::VscodeWslExtension { distro, extension } => {
@@ -78,6 +106,8 @@ pub struct SetupStep {
     pub id: String,
     pub label: String,
     pub cmd: Cmd,
+    /// Runs as root (through the pkexec helper).
+    pub root: bool,
 }
 
 pub fn detect_available(os: Os) -> Vec<PmId> {
@@ -91,8 +121,12 @@ pub fn detect_available(os: Os) -> Vec<PmId> {
             managers.push(PmId::Github);
             managers
         }
-        Os::Linux if flatpak::is_available() => vec![PmId::Flatpak],
-        Os::Linux | Os::Other => Vec::new(),
+        Os::Linux => flatpak::is_available()
+            .then_some(PmId::Flatpak)
+            .into_iter()
+            .chain(detect_native())
+            .collect(),
+        Os::Other => Vec::new(),
     }
 }
 
@@ -113,11 +147,22 @@ pub fn install_action(manager: PmId, app: &App) -> Option<InstallAction> {
             .flatpak
             .as_ref()
             .map(|package| InstallAction::Command(flatpak::install_cmd(package))),
+        // Native Linux only: WSL installs are planned by the runner's WSL step.
         PmId::Apt => app
             .packages
             .apt
             .as_deref()
-            .map(|package| InstallAction::Command(apt::install_cmd(&[package]))),
+            .map(|package| InstallAction::Root(apt::native_install_cmd(&[package]))),
+        PmId::Dnf => app
+            .packages
+            .dnf
+            .as_deref()
+            .map(|package| InstallAction::Root(dnf::install_cmd(&[package]))),
+        PmId::Pacman => app
+            .packages
+            .pacman
+            .as_deref()
+            .map(|package| InstallAction::Root(pacman::install_cmd(&[package]))),
     }
 }
 
@@ -129,8 +174,16 @@ pub fn setup_steps(manager: PmId, app: &App) -> Vec<SetupStep> {
                 id: format!("setup-flatpak-{name}"),
                 label: format!("Add the {name} Flatpak repository"),
                 cmd: flatpak::add_remote_cmd(name, url),
+                root: false,
             }]
         }
+        // apt needs fresh package lists; dnf refreshes on its own and pacman syncs with -Syu.
+        (PmId::Apt, _) => vec![SetupStep {
+            id: "setup-apt-update".into(),
+            label: "Update package lists".into(),
+            cmd: apt::native_update_cmd(),
+            root: true,
+        }],
         _ => Vec::new(),
     }
 }
@@ -140,7 +193,7 @@ pub fn interpret_exit(manager: PmId, code: Option<i32>) -> InstallOutcome {
         PmId::Winget => winget::interpret_exit(code),
         PmId::Github => github::interpret_exit(code),
         PmId::Flatpak => flatpak::interpret_exit(code),
-        PmId::Apt => apt::interpret_exit(code),
+        PmId::Apt | PmId::Dnf | PmId::Pacman => apt::interpret_exit(code),
     }
 }
 
@@ -161,14 +214,25 @@ pub fn installed_packages(manager: PmId, apps: &[&App]) -> Result<Vec<String>> {
             .map(|package| package.repo.clone())
             .collect()),
         PmId::Flatpak => flatpak::list_installed(),
-        PmId::Apt => {
+        PmId::Apt | PmId::Dnf | PmId::Pacman => {
             let packages: Vec<&str> = apps
                 .iter()
-                .filter_map(|app| app.packages.apt.as_deref())
+                .filter_map(|app| app.packages.native(manager))
                 .collect();
-            Ok(crate::exec::capture_stdout(&apt::query_cmd(&packages))
-                .map(|output| apt::parse_query(&output))
-                .unwrap_or_default())
+            if packages.is_empty() {
+                return Ok(Vec::new());
+            }
+            let query = match manager {
+                PmId::Apt => apt::query_cmd(&packages),
+                PmId::Dnf => dnf::query_cmd(&packages),
+                _ => pacman::query_cmd(&packages),
+            };
+            let output = crate::exec::capture_stdout(&query).unwrap_or_default();
+            Ok(match manager {
+                PmId::Apt => apt::parse_query(&output),
+                PmId::Dnf => dnf::parse_query(&output, &packages),
+                _ => pacman::parse_query(&output, &packages),
+            })
         }
     }
 }

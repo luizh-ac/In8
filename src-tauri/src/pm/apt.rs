@@ -1,5 +1,6 @@
-//! apt (Debian, Ubuntu). For now used inside WSL distros, where commands run as root
-//! through `wsl.exe -u root`; native Linux support (via pkexec) comes later.
+//! apt (Debian, Ubuntu). Inside WSL distros commands run as root through `wsl.exe -u root`
+//! (`install_cmd`, with `env` because variables don't cross into WSL); on native Linux they go
+//! through the pkexec helper (`native_*`), which only accepts these exact shapes.
 
 use super::InstallOutcome;
 use crate::exec::Cmd;
@@ -13,6 +14,17 @@ pub fn install_cmd(packages: &[&str]) -> Cmd {
     Cmd::new("env")
         .args(["DEBIAN_FRONTEND=noninteractive", "apt-get", "install", "-y"])
         .args(packages.iter().copied())
+}
+
+pub fn native_update_cmd() -> Cmd {
+    Cmd::new("apt-get").arg("update")
+}
+
+pub fn native_install_cmd(packages: &[&str]) -> Cmd {
+    Cmd::new("apt-get")
+        .args(["install", "-y"])
+        .args(packages.iter().copied())
+        .env("DEBIAN_FRONTEND", "noninteractive")
 }
 
 pub fn interpret_exit(code: Option<i32>) -> InstallOutcome {

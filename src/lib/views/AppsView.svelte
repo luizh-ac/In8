@@ -53,6 +53,22 @@
   </p>
 {/if}
 
+{#if store.platform?.os === "linux" && !store.platform.managers.includes("flatpak") && store.platform.managers.length > 0}
+  <div class="mt-4 flex flex-wrap items-center gap-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+    <p class="flex-1">{store.setupFlatpak ? text.apps.flatpakQueued : text.apps.noFlatpak}</p>
+    <button
+      type="button"
+      aria-pressed={store.setupFlatpak}
+      onclick={() => (store.setupFlatpak = !store.setupFlatpak)}
+      class="rounded-md border px-3 py-1.5 text-sm {store.setupFlatpak
+        ? 'border-indigo-500 bg-indigo-50 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200'
+        : 'border-amber-400 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/40'}"
+    >
+      {store.setupFlatpak ? "✓ " : ""}{text.apps.installFlatpak}
+    </button>
+  </div>
+{/if}
+
 {#if groups.length === 0}
   <p class="mt-8 text-sm text-zinc-500">{text.apps.noResults}</p>
 {/if}

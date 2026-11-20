@@ -27,7 +27,7 @@
       "name": "Git",
       "description": "Version control",
       "category": "dev",
-      "packages": { "winget": "Git.Git", "apt": "git" },
+      "packages": { "winget": "Git.Git", "apt": "git", "dnf": "git", "pacman": "git" },
       "targets": ["host", "wsl"],
       "preferLinux": "native"
     },
@@ -36,7 +36,7 @@
       "name": "Node.js LTS",
       "description": "JavaScript runtime",
       "category": "dev",
-      "packages": { "winget": "OpenJS.NodeJS.LTS", "apt": "nodejs" },
+      "packages": { "winget": "OpenJS.NodeJS.LTS", "apt": "nodejs", "dnf": "nodejs", "pacman": "nodejs-lts-krypton" },
       "targets": ["host", "wsl"],
       "preferLinux": "native"
     },
@@ -45,7 +45,7 @@
       "name": "Python 3",
       "description": "Python language and pip",
       "category": "dev",
-      "packages": { "winget": "Python.Python.3.14", "apt": "python3" },
+      "packages": { "winget": "Python.Python.3.14", "apt": "python3", "dnf": "python3", "pacman": "python" },
       "targets": ["host", "wsl"],
       "preferLinux": "native"
     },
@@ -54,7 +54,7 @@
       "name": "Rust (rustup)",
       "description": "Rust toolchain installer",
       "category": "dev",
-      "packages": { "winget": "Rustlang.Rustup", "apt": "rustup" },
+      "packages": { "winget": "Rustlang.Rustup", "apt": "rustup", "dnf": "rustup", "pacman": "rustup" },
       "targets": ["host", "wsl"],
       "preferLinux": "native"
     },
@@ -126,7 +126,7 @@
       "name": "7-Zip",
       "description": "File archiver",
       "category": "utilities",
-      "packages": { "winget": "7zip.7zip", "apt": "7zip" },
+      "packages": { "winget": "7zip.7zip", "apt": "7zip", "dnf": "7zip", "pacman": "7zip" },
       "targets": ["host", "wsl"],
       "preferLinux": "native"
     },
@@ -135,7 +135,7 @@
       "name": "qBittorrent",
       "description": "BitTorrent client",
       "category": "utilities",
-      "packages": { "winget": "qBittorrent.qBittorrent", "flatpak": "org.qbittorrent.qBittorrent", "apt": "qbittorrent" }
+      "packages": { "winget": "qBittorrent.qBittorrent", "flatpak": "org.qbittorrent.qBittorrent", "apt": "qbittorrent", "dnf": "qbittorrent", "pacman": "qbittorrent" }
     },
     {
       "id": "steam",

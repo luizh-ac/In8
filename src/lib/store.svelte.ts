@@ -13,6 +13,7 @@ import {
   getTweaks,
   getWslInstalled,
   getWslStatus,
+  refreshPlatform,
   restartAsAdmin,
   saveProfile,
   saveSettings,
@@ -86,6 +87,7 @@ const DEFAULT_SETTINGS: Settings = {
   dryRunByDefault: true,
   theme: "system",
   wslDistro: null,
+  linuxPreferNative: false,
 };
 
 export function message(error: unknown): string {
@@ -100,6 +102,7 @@ export function profileSelection(profile: Profile): RunRequest {
     tweaks: profile.tweaks.map((id) => ({ id, revert: false })),
     debloat: profile.debloat,
     postinstall: profile.postinstall,
+    setupFlatpak: false,
   };
 }
 
@@ -154,6 +157,9 @@ class AppStore {
   /** Picked options per task ID (e.g. VS Code extensions). */
   postOptions = new SvelteMap<string, string[]>();
 
+  /** Linux: install Flatpak in the next run. */
+  setupFlatpak = $state(false);
+
   profiles = $state<ProfileEntry[]>([]);
   profileError = $state<string | null>(null);
 
@@ -183,7 +189,8 @@ class AppStore {
       this.pendingWslActions.length +
       this.tweakChoices.size +
       this.debloatSelected.size +
-      this.postSelected.size,
+      this.postSelected.size +
+      (this.setupFlatpak ? 1 : 0),
   );
 
   /** A selected tweak writes to HKLM and In8 isn't elevated (Windows only). */
@@ -252,8 +259,22 @@ class AppStore {
   }
 
   async updateSettings(patch: Partial<Settings>): Promise<void> {
+    const preferNativeChanged =
+      patch.linuxPreferNative !== undefined && patch.linuxPreferNative !== this.settings.linuxPreferNative;
     this.settings = await saveSettings({ ...this.settings, ...patch });
     this.applyTheme();
+    if (preferNativeChanged) await this.reloadPlatform();
+  }
+
+  /** Detects package managers again, then reloads the catalog and what's installed (resolutions change). */
+  async reloadPlatform(): Promise<void> {
+    this.platform = await refreshPlatform();
+    this.catalog = await getCatalog();
+    for (const app of this.selectedApps) {
+      if (!this.isAvailable(app)) this.selected.delete(app.id);
+    }
+    if (this.setupFlatpak && this.platform.managers.includes("flatpak")) this.setupFlatpak = false;
+    await this.refreshInstalled();
   }
 
   async refreshInstalled(): Promise<void> {
@@ -441,6 +462,7 @@ class AppStore {
     this.tweakChoices.clear();
     this.debloatSelected.clear();
     this.postSelected.clear();
+    this.setupFlatpak = false;
   }
 
   resetRun(): void {
@@ -465,6 +487,7 @@ class AppStore {
           options: [...(this.postOptions.get(id) ?? [])],
         };
       }),
+      setupFlatpak: this.setupFlatpak,
     };
   }
 
@@ -489,6 +512,7 @@ class AppStore {
     for (const id of selection.debloat) {
       if (this.debloatItems.some((item) => item.id === id && item.installed)) this.debloatSelected.add(id);
     }
+    this.setupFlatpak = selection.setupFlatpak;
     for (const wanted of selection.postinstall) {
       this.restorePostValues(wanted.id, wanted.values, wanted.options);
       if (this.postTargets(wanted.id).includes(wanted.target)) this.postSelected.add(postKey(wanted.id, wanted.target));
@@ -685,6 +709,10 @@ class AppStore {
       this.tweakChoices.clear();
       this.debloatSelected.clear();
       this.postSelected.clear();
+      const flatpakWasSetUp = this.setupFlatpak;
+      this.setupFlatpak = false;
+      // On Linux a run can add Flatpak (or the distro's packages); detect managers again first.
+      if (this.platform?.os === "linux" || flatpakWasSetUp) await this.reloadPlatform().catch(() => {});
       await Promise.all([
         this.refreshInstalled(),
         this.refreshWsl().then(() => this.refreshPostinstall()),

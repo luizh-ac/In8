@@ -10,6 +10,7 @@ mod pm;
 mod postinstall;
 mod profiles;
 mod resolve;
+mod root;
 mod runner;
 mod settings;
 mod tweaks;
@@ -19,6 +20,15 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock};
 
 use tauri::Manager;
+
+/// `in8 --root-helper`: the Linux root helper started through pkexec (see `root.rs`), not the app.
+pub fn root_helper_requested() -> bool {
+    std::env::args().nth(1).as_deref() == Some(root::HELPER_FLAG)
+}
+
+pub fn run_root_helper() -> i32 {
+    root::run_helper()
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -34,7 +44,7 @@ pub fn run() {
             }
             let config_dir = app.path().config_dir()?.join("in8");
             let settings = settings::SettingsStore::new(&config_dir);
-            let platform = platform::PlatformInfo::detect();
+            let platform = platform::PlatformInfo::detect_with(settings.load().linux_prefer_native);
 
             let elevated = elevation::is_elevated();
             let mut elevation_declined = false;
@@ -66,7 +76,7 @@ pub fn run() {
             );
             app.manage(commands::AppState {
                 catalog: Arc::clone(&catalog),
-                platform: Arc::new(platform),
+                platform: RwLock::new(Arc::new(platform)),
                 running: Arc::new(AtomicBool::new(false)),
                 wsl: RwLock::new(None),
                 profiles: Arc::new(commands::ProfileState {
@@ -111,6 +121,7 @@ pub fn run() {
             commands::get_settings,
             commands::save_settings,
             commands::get_admin_status,
+            commands::refresh_platform,
             commands::restart_as_admin,
             commands::take_pending_selection,
         ])

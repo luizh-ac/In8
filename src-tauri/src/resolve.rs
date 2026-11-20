@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use crate::catalog::{App, Target};
+use crate::catalog::{App, PreferLinux, Target};
 use crate::platform::{Os, PlatformInfo};
 use crate::pm::PmId;
 use crate::wsl::DistroDetails;
@@ -80,15 +80,38 @@ pub fn resolve_wsl(app: &App, distro: Option<&DistroDetails>) -> Option<Resoluti
 }
 
 /// Native managers (apt, dnf, pacman) come in a later phase; for now Linux installs use Flatpak.
+/// Flatpak first by default; the distro's package first when the app or the user prefers it.
 fn resolve_linux(app: &App, platform: &PlatformInfo) -> Resolution {
-    match &app.packages.flatpak {
-        Some(_) if !platform.has(PmId::Flatpak) => unavailable("Flatpak isn't installed"),
-        Some(package) => Resolution::Available {
+    let flatpak = app
+        .packages
+        .flatpak
+        .as_ref()
+        .filter(|_| platform.has(PmId::Flatpak))
+        .map(|package| Resolution::Available {
             manager: PmId::Flatpak,
             package: package.id().to_string(),
-        },
-        None => unavailable("No supported package for this system yet"),
-    }
+        });
+    let native = platform.native_manager().and_then(|manager| {
+        app.packages
+            .native(manager)
+            .map(|package| Resolution::Available {
+                manager,
+                package: package.to_string(),
+            })
+    });
+    let native_first = app.prefer_linux == PreferLinux::Native || platform.prefer_native;
+    let (first, second) = if native_first {
+        (native, flatpak)
+    } else {
+        (flatpak, native)
+    };
+    first.or(second).unwrap_or_else(|| {
+        if app.packages.flatpak.is_some() && !platform.has(PmId::Flatpak) {
+            unavailable("Flatpak isn't installed")
+        } else {
+            unavailable("No package for this distro")
+        }
+    })
 }
 
 #[cfg(test)]
@@ -103,6 +126,7 @@ mod tests {
             version: "0.0.0",
             distro: None,
             managers: managers.to_vec(),
+            prefer_native: false,
         }
     }
 
@@ -220,5 +244,46 @@ mod tests {
             &platform(Os::Linux, &[PmId::Flatpak]),
         );
         assert!(matches!(resolution, Resolution::Unavailable { .. }));
+    }
+
+    #[test]
+    fn linux_prefers_flatpak_then_the_distro_package() {
+        let both = app(
+            r#"{ "flatpak": "org.qbittorrent.qBittorrent", "apt": "qbittorrent", "dnf": "qbittorrent" }"#,
+        );
+        let manager = |platform: &PlatformInfo| match resolve(&both, platform) {
+            Resolution::Available { manager, .. } => Some(manager),
+            Resolution::Unavailable { .. } => None,
+        };
+        assert_eq!(
+            manager(&platform(Os::Linux, &[PmId::Flatpak, PmId::Apt])),
+            Some(PmId::Flatpak)
+        );
+        // No Flatpak: the distro's package.
+        assert_eq!(manager(&platform(Os::Linux, &[PmId::Dnf])), Some(PmId::Dnf));
+        // The user prefers distro packages.
+        let mut native_first = platform(Os::Linux, &[PmId::Flatpak, PmId::Apt]);
+        native_first.prefer_native = true;
+        assert_eq!(manager(&native_first), Some(PmId::Apt));
+        // pacman without a pacman name: Flathub still works.
+        assert_eq!(
+            manager(&platform(Os::Linux, &[PmId::Flatpak, PmId::Pacman])),
+            Some(PmId::Flatpak)
+        );
+        assert_eq!(manager(&platform(Os::Linux, &[PmId::Pacman])), None);
+    }
+
+    #[test]
+    fn apps_preferring_native_use_the_distro_package_first() {
+        let json = r#"{ "version": 1, "apps": [{ "id": "x", "name": "X", "description": "", "category": "dev",
+            "packages": { "flatpak": "a.b.C", "pacman": "x" }, "preferLinux": "native" }] }"#;
+        let app = Catalog::parse(json).unwrap().apps.remove(0);
+        assert_eq!(
+            resolve(&app, &platform(Os::Linux, &[PmId::Flatpak, PmId::Pacman])),
+            Resolution::Available {
+                manager: PmId::Pacman,
+                package: "x".into()
+            }
+        );
     }
 }

@@ -3,8 +3,8 @@ use crate::catalog::FlatpakPackage;
 use crate::error::Result;
 use crate::exec::{self, Cmd};
 
-const FLATHUB_NAME: &str = "flathub";
-const FLATHUB_REPO: &str = "https://dl.flathub.org/repo/flathub.flatpakrepo";
+pub const FLATHUB_NAME: &str = "flathub";
+pub const FLATHUB_REPO: &str = "https://dl.flathub.org/repo/flathub.flatpakrepo";
 
 pub fn is_available() -> bool {
     exec::capture(&Cmd::new("flatpak").arg("--version")).is_some()
