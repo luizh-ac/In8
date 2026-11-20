@@ -14,6 +14,7 @@ mod root;
 mod runner;
 mod settings;
 mod tweaks;
+mod update;
 mod wsl;
 
 use std::sync::atomic::AtomicBool;
@@ -34,6 +35,7 @@ pub fn run_root_helper() -> i32 {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -122,6 +124,8 @@ pub fn run() {
             commands::save_settings,
             commands::get_admin_status,
             commands::refresh_platform,
+            commands::check_update,
+            commands::install_update,
             commands::restart_as_admin,
             commands::take_pending_selection,
         ])

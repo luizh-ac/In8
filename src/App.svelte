@@ -34,6 +34,22 @@
   <Sidebar />
 
   <div class="flex min-w-0 flex-1 flex-col">
+    {#if store.update}
+      <div class="flex items-center gap-3 border-b border-indigo-200 bg-indigo-50 px-8 py-2 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
+        <span>{text.update.available(store.update.version)}</span>
+        {#if store.updateError}
+          <span class="text-red-600 dark:text-red-400">{store.updateError}</span>
+        {/if}
+        <button
+          type="button"
+          disabled={store.installingUpdate || store.running}
+          onclick={() => store.installUpdate()}
+          class="ml-auto rounded-md bg-indigo-600 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+        >
+          {store.installingUpdate ? text.update.installing : text.update.install}
+        </button>
+      </div>
+    {/if}
     <main class="flex-1 overflow-y-auto p-8">
       {#if store.loadError}
         <p class="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">

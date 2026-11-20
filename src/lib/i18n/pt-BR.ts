@@ -270,6 +270,16 @@ export const ptBR: Strings = {
       "Quando um app existe no Flathub e na sua distro (apt, dnf ou pacman), usa o pacote da distro. Pacotes da distro pedem sua senha uma vez por execução.",
     saved: "Salvo.",
   },
+  update: {
+    available: (version: string) => `O In8 ${version} está disponível.`,
+    install: "Atualizar e reiniciar",
+    installing: "Atualizando…",
+    check: "Procurar atualizações",
+    checking: "Procurando…",
+    upToDate: "O In8 está atualizado.",
+    version: (version: string) => `Versão ${version}`,
+    title: "Atualizações",
+  },
   bar: {
     selected: (count: number) => (count === 1 ? "1 item selecionado" : `${count} itens selecionados`),
     clear: "Limpar",

@@ -18,6 +18,8 @@ pub enum Error {
     Profile(String),
     #[error("Backup: {0}")]
     Backup(String),
+    #[error("Update: {0}")]
+    Update(String),
     #[error("File dialog: {0}")]
     Dialog(String),
     #[error("Another run is already in progress")]

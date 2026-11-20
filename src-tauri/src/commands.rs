@@ -23,6 +23,7 @@ use crate::resolve::{Resolution, resolve, resolve_wsl};
 use crate::runner::{self, RunEvent, RunRequest, RunSummary, SystemContext};
 use crate::settings::{Settings, SettingsStore};
 use crate::tweaks::{self, TweakCatalog, TweakInfo, TweakState};
+use crate::update::{self, UpdateInfo};
 use crate::wsl::{self, DistroDetails, OnlineDistro, WslConfig, WslStatus};
 
 pub struct AppState {
@@ -329,6 +330,21 @@ pub async fn refresh_platform(state: State<'_, AppState>) -> Result<PlatformInfo
         .write()
         .unwrap_or_else(|poisoned| poisoned.into_inner()) = Arc::new(platform.clone());
     Ok(platform)
+}
+
+/// A newer In8 on GitHub Releases, if there is one.
+#[tauri::command]
+pub async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>> {
+    update::check(&app).await
+}
+
+/// Installs the newer In8 and restarts. Refused while a run is going on.
+#[tauri::command]
+pub async fn install_update(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    if state.running.load(Ordering::SeqCst) {
+        return Err(Error::AlreadyRunning);
+    }
+    update::install(&app).await
 }
 
 #[tauri::command]

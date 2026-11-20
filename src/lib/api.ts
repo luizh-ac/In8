@@ -6,6 +6,7 @@ import type {
   DebloatInfo,
   Settings,
   TweakInfo,
+  UpdateInfo,
   ImportResult,
   OnlineDistro,
   PlatformInfo,
@@ -111,6 +112,16 @@ export function saveSettings(settings: Settings): Promise<Settings> {
 /** Detects the package managers again (after installing Flatpak or changing the Linux preference). */
 export function refreshPlatform(): Promise<PlatformInfo> {
   return invoke<PlatformInfo>("refresh_platform");
+}
+
+/** A newer In8 on GitHub Releases, or null when up to date. */
+export function checkUpdate(): Promise<UpdateInfo | null> {
+  return invoke<UpdateInfo | null>("check_update");
+}
+
+/** Downloads and installs the update, then In8 restarts. */
+export function installUpdate(): Promise<void> {
+  return invoke<void>("install_update");
 }
 
 export function getAdminStatus(): Promise<AdminStatus> {

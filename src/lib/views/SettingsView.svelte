@@ -139,6 +139,27 @@
     </label>
   {/if}
 
+  <div class="flex flex-wrap items-center gap-4 px-4 py-4">
+    <span>
+      <span class="block text-sm font-medium">{text.update.title}</span>
+      <span class="block text-xs text-zinc-500">
+        {store.platform ? text.update.version(store.platform.version) : ""}
+        {#if store.upToDate}· {text.update.upToDate}{/if}
+      </span>
+      {#if store.updateError}
+        <span class="block text-xs text-red-600 dark:text-red-400">{store.updateError}</span>
+      {/if}
+    </span>
+    <button
+      type="button"
+      disabled={store.checkingUpdate}
+      onclick={() => store.checkForUpdate()}
+      class="ml-auto rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+    >
+      {store.checkingUpdate ? text.update.checking : text.update.check}
+    </button>
+  </div>
+
   {#if store.isWindows}
     <div class="flex items-center gap-4 px-4 py-4">
       <span>

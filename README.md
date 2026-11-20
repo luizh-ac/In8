@@ -36,6 +36,15 @@ bash scripts/build-linux.sh  # Linux (or WSL): AppImage and .deb in src-tauri/ta
 
 `scripts/sandbox.ps1` opens a release build in Windows Sandbox, to try tweaks and debloat without touching your PC.
 
+## Releasing
+
+1. Bump the version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `package.json`.
+2. Commit, then tag and push: `git tag v0.2.0 && git push origin v0.2.0`.
+3. The Release workflow builds the Windows installer, the AppImage and the `.deb`, signs the update files
+   and creates a draft release. Publish the draft: from then on, In8 offers that version as an update.
+
+Updates are signed with a key kept outside the repository; CI reads it from the `TAURI_SIGNING_PRIVATE_KEY` secret.
+
 ## License
 
 [MIT](LICENSE)

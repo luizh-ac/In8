@@ -2,6 +2,7 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import {
   deleteProfile,
+  checkUpdate,
   getAdminStatus,
   getCatalog,
   getDebloat,
@@ -13,6 +14,7 @@ import {
   getTweaks,
   getWslInstalled,
   getWslStatus,
+  installUpdate,
   refreshPlatform,
   restartAsAdmin,
   saveProfile,
@@ -38,6 +40,7 @@ import type {
   Target,
   TaskStatus,
   TweakInfo,
+  UpdateInfo,
   WslAction,
   WslStatus,
 } from "./types";
@@ -167,6 +170,13 @@ class AppStore {
   profiles = $state<ProfileEntry[]>([]);
   profileError = $state<string | null>(null);
 
+  update = $state<UpdateInfo | null>(null);
+  checkingUpdate = $state(false);
+  installingUpdate = $state(false);
+  updateError = $state<string | null>(null);
+  /** The last check found nothing newer. */
+  upToDate = $state(false);
+
   dryRun = $state(true);
   running = $state(false);
   tasks = $state<TaskState[]>([]);
@@ -247,6 +257,8 @@ class AppStore {
       this.refreshTweaks(),
       this.refreshDebloat(),
     ]);
+    // Quietly look for a newer In8; problems only show when checking from Settings.
+    void this.checkForUpdate(true);
     // Coming back from "Restart as administrator": restore the selection and go straight to review.
     const pending = await takePendingSelection().catch(() => null);
     if (pending) {
@@ -699,6 +711,34 @@ class AppStore {
 
   async deleteProfile(id: string): Promise<void> {
     this.profiles = await deleteProfile(id);
+  }
+
+  async checkForUpdate(quiet = false): Promise<void> {
+    if (this.checkingUpdate) return;
+    this.checkingUpdate = true;
+    this.updateError = null;
+    try {
+      this.update = await checkUpdate();
+      this.upToDate = this.update === null;
+    } catch (error) {
+      if (!quiet) this.updateError = message(error);
+    } finally {
+      this.checkingUpdate = false;
+    }
+  }
+
+  /** Downloads and installs the update; In8 restarts when it's done. */
+  async installUpdate(): Promise<void> {
+    if (this.installingUpdate || this.running) return;
+    this.installingUpdate = true;
+    this.updateError = null;
+    try {
+      await installUpdate();
+    } catch (error) {
+      this.updateError = message(error);
+    } finally {
+      this.installingUpdate = false;
+    }
   }
 
   /** Relaunches elevated with the current selection. Resolves to false if UAC was declined. */

@@ -242,6 +242,13 @@ export interface Settings {
   linuxPreferNative: boolean;
 }
 
+// update.rs
+export interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  notes: string | null;
+}
+
 // commands.rs
 export interface AdminStatus {
   elevated: boolean;

@@ -264,6 +264,16 @@ export const en = {
       "When an app comes both from Flathub and from your distro (apt, dnf or pacman), use the distro's package. Distro packages ask for your password once per run.",
     saved: "Saved.",
   },
+  update: {
+    available: (version: string) => `In8 ${version} is available.`,
+    install: "Update and restart",
+    installing: "Updating…",
+    check: "Check for updates",
+    checking: "Checking…",
+    upToDate: "In8 is up to date.",
+    version: (version: string) => `Version ${version}`,
+    title: "Updates",
+  },
   bar: {
     selected: (count: number) => (count === 1 ? "1 item selected" : `${count} items selected`),
     clear: "Clear",

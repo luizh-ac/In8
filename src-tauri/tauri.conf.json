@@ -30,7 +30,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "deb", "appimage"],
+    "targets": [
+      "nsis",
+      "deb",
+      "appimage"
+    ],
     "publisher": "In8",
     "category": "Utility",
     "shortDescription": "Get a freshly formatted PC ready",
@@ -49,7 +53,20 @@
     },
     "linux": {
       "deb": {
-        "depends": ["pkexec | policykit-1"]
+        "depends": [
+          "pkexec | policykit-1"
+        ]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRGQjRGNkRDRDBCOTQ0RkEKUldUNlJMblEzUGEwVDdVbThESGVsK1Riei9UOEQvWkNuenhaaTdMeGZFdytrZ2pBRHZLaENDWlAK",
+      "endpoints": [
+        "https://github.com/OWNER/REPO/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }
