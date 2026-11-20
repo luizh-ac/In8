@@ -1,5 +1,7 @@
 //! Administrator rights on Windows: checking the process token and relaunching through UAC.
-//! There is no equivalent on Linux on purpose (see PLAN.md §7): root tasks go through `pkexec` per run.
+//! There is no equivalent on Linux on purpose: a GUI running as root breaks on Wayland, installs
+//! Flatpaks for the wrong user and writes settings into root's home. Root tasks go through `pkexec`
+//! instead, once per run (see `root.rs`).
 
 /// Whether In8 runs with administrator rights. Always `false` outside Windows.
 pub fn is_elevated() -> bool {

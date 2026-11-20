@@ -1,7 +1,8 @@
 name: Release
 
 # Push a tag like v0.2.0 (matching the version in tauri.conf.json, Cargo.toml and package.json).
-# This builds the installers, signs the update files and creates a draft release; publish the draft
+# Create the draft release first (see README). This builds the installers, signs the update files and
+# attaches them to the draft; publish the draft
 # on GitHub to make it the update everyone's In8 sees.
 on:
   push:
