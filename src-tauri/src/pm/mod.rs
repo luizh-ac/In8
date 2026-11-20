@@ -39,11 +39,14 @@ pub enum InstallAction {
     GithubRelease(GithubPackage),
     /// `code --install-extension <id>`; VS Code is located when the task runs.
     VscodeExtension(String),
+    /// Applies or reverts a tweak in-process (registry, power plan, gsettings).
+    Tweak(Box<crate::tweaks::TweakJob>),
 }
 
 impl InstallAction {
     pub fn display(&self) -> String {
         match self {
+            Self::Tweak(job) => job.tweak.describe(job.revert),
             Self::Command(cmd) => cmd.display(),
             Self::GithubRelease(package) => github::describe(package),
             Self::VscodeExtension(extension) => format!("code --install-extension {extension}"),

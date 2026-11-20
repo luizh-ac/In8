@@ -1,6 +1,8 @@
 //! Commands exposed to the frontend. Kept thin: the logic lives in the other modules.
 
 use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
@@ -10,12 +12,16 @@ use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::catalog::{App, Catalog};
+use crate::debloat::{self, DebloatCatalog, DebloatInfo};
+use crate::elevation::{self, Relaunch};
 use crate::error::{Error, Result};
 use crate::platform::{Os, PlatformInfo};
 use crate::pm::{self, PmId, apt};
-use crate::profiles::{ImportResult, Profile, ProfileEntry, UserProfiles};
+use crate::profiles::{self, ImportResult, Profile, ProfileEntry, UserProfiles};
 use crate::resolve::{Resolution, resolve, resolve_wsl};
-use crate::runner::{self, RunEvent, RunRequest, RunSummary};
+use crate::runner::{self, RunEvent, RunRequest, RunSummary, SystemContext};
+use crate::settings::{Settings, SettingsStore};
+use crate::tweaks::{self, TweakCatalog, TweakInfo, TweakState};
 use crate::wsl::{self, DistroDetails, OnlineDistro, WslConfig, WslStatus};
 
 pub struct AppState {
@@ -25,6 +31,24 @@ pub struct AppState {
     /// The WSL distro In8 works with, from the last `get_wsl_status`.
     pub wsl: RwLock<Option<DistroDetails>>,
     pub profiles: Arc<ProfileState>,
+    pub tweaks: Arc<TweakCatalog>,
+    pub debloat: Arc<DebloatCatalog>,
+    pub tweak_state: Arc<TweakState>,
+    pub settings: Mutex<SettingsStore>,
+    pub admin: AdminStatus,
+    /// The selection handed over to the elevated copy by "Restart as administrator".
+    pub pending_selection: PathBuf,
+}
+
+/// Mirrored in `src/lib/types.ts` (`AdminStatus`).
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminStatus {
+    pub elevated: bool,
+    /// "Always run as administrator" is on but the UAC prompt was declined at start.
+    pub declined: bool,
+    /// Only Windows can relaunch elevated.
+    pub can_elevate: bool,
 }
 
 pub struct ProfileState {
@@ -187,8 +211,24 @@ pub async fn start_run(
     let catalog = Arc::clone(&state.catalog);
     let platform = Arc::clone(&state.platform);
     let distro = state.wsl_distro();
+    let tweak_catalog = Arc::clone(&state.tweaks);
+    let debloat_catalog = Arc::clone(&state.debloat);
+    let tweak_state = Arc::clone(&state.tweak_state);
     let result = blocking(move || {
-        let tasks = runner::plan(&catalog, &platform, distro.as_ref(), &request)?;
+        let context = SystemContext {
+            tweaks: &tweak_catalog,
+            debloat: &debloat_catalog,
+            state: &tweak_state,
+        };
+        // Debloat first, then apps and WSL, then tweaks.
+        let (mut tasks, tweak_tasks) = runner::plan_system(&context, &platform, &request)?;
+        tasks.extend(runner::plan(
+            &catalog,
+            &platform,
+            distro.as_ref(),
+            &request,
+        )?);
+        tasks.extend(tweak_tasks);
         Ok(runner::run(&tasks, dry_run, |event| {
             let _ = on_event.send(event);
         }))
@@ -196,6 +236,88 @@ pub async fn start_run(
     .await;
     running.store(false, Ordering::SeqCst);
     result?
+}
+
+/// Tweaks for this system with their current state. Reads the registry or gsettings.
+#[tauri::command]
+pub async fn get_tweaks(state: State<'_, AppState>) -> Result<Vec<TweakInfo>> {
+    let catalog = Arc::clone(&state.tweaks);
+    let platform = Arc::clone(&state.platform);
+    let tweak_state = Arc::clone(&state.tweak_state);
+    blocking(move || tweaks::list(&catalog, &platform, &tweak_state)).await
+}
+
+/// Debloat items with whether they're installed. Empty outside Windows. Takes a few seconds.
+#[tauri::command]
+pub async fn get_debloat(state: State<'_, AppState>) -> Result<Vec<DebloatInfo>> {
+    let catalog = Arc::clone(&state.debloat);
+    let platform = Arc::clone(&state.platform);
+    blocking(move || debloat::list(&catalog, &platform)).await?
+}
+
+#[tauri::command]
+pub fn get_settings(state: State<'_, AppState>) -> Settings {
+    state
+        .settings
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .load()
+}
+
+#[tauri::command]
+pub fn save_settings(state: State<'_, AppState>, settings: Settings) -> Result<Settings> {
+    state
+        .settings
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .save(&settings)
+}
+
+#[tauri::command]
+pub fn get_admin_status(state: State<'_, AppState>) -> AdminStatus {
+    state.admin
+}
+
+/// Saves the selection for the elevated copy, asks for UAC and closes this window if it started.
+/// Returns `false` when the UAC prompt was declined.
+#[tauri::command]
+pub async fn restart_as_admin(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    selection: RunRequest,
+) -> Result<bool> {
+    if state.running.load(Ordering::SeqCst) {
+        return Err(Error::AlreadyRunning);
+    }
+    let path = state.pending_selection.clone();
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    fs::write(&path, serde_json::to_string(&selection)?)?;
+    match blocking(|| elevation::relaunch_elevated(&[])).await? {
+        Ok(Relaunch::Started) => {
+            app.exit(0);
+            Ok(true)
+        }
+        Ok(Relaunch::Declined) => {
+            let _ = fs::remove_file(&path);
+            Ok(false)
+        }
+        Err(error) => {
+            let _ = fs::remove_file(&path);
+            Err(error.into())
+        }
+    }
+}
+
+/// The selection left by "Restart as administrator", once (the file is deleted).
+#[tauri::command]
+pub fn take_pending_selection(state: State<'_, AppState>) -> Option<RunRequest> {
+    let path = &state.pending_selection;
+    let content = fs::read_to_string(path).ok()?;
+    let _ = fs::remove_file(path);
+    let selection: RunRequest = serde_json::from_str(&content).ok()?;
+    Some(profiles::sanitize_selection(&state.catalog, &selection).0)
 }
 
 fn profile_entries(state: &ProfileState) -> Result<Vec<ProfileEntry>> {
@@ -368,6 +490,7 @@ mod tests {
                 wsl::WslAction::DockerEngine,
                 wsl::WslAction::VscodeExtension,
             ],
+            ..Default::default()
         };
         let tasks = runner::plan(&catalog, &platform, distro.as_ref(), &request).unwrap();
         runner::run(&tasks, true, |event| {

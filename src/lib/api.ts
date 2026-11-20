@@ -1,7 +1,11 @@
 // Single entry point for calls into the Rust backend.
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
+  AdminStatus,
   CatalogApp,
+  DebloatInfo,
+  Settings,
+  TweakInfo,
   ImportResult,
   OnlineDistro,
   PlatformInfo,
@@ -78,6 +82,38 @@ export function exportBackup(selection: RunRequest): Promise<string | null> {
 /** Opens a file picker and imports a backup. Resolves to null if cancelled. */
 export function importBackup(): Promise<ImportResult | null> {
   return invoke<ImportResult | null>("import_backup");
+}
+
+/** Tweaks for this system with their current state. */
+export function getTweaks(): Promise<TweakInfo[]> {
+  return invoke<TweakInfo[]>("get_tweaks");
+}
+
+/** Debloat items with whether they're installed (empty outside Windows). Takes a few seconds. */
+export function getDebloat(): Promise<DebloatInfo[]> {
+  return invoke<DebloatInfo[]>("get_debloat");
+}
+
+export function getSettings(): Promise<Settings> {
+  return invoke<Settings>("get_settings");
+}
+
+export function saveSettings(settings: Settings): Promise<Settings> {
+  return invoke<Settings>("save_settings", { settings });
+}
+
+export function getAdminStatus(): Promise<AdminStatus> {
+  return invoke<AdminStatus>("get_admin_status");
+}
+
+/** Relaunches In8 elevated with this selection. Resolves to false if UAC was declined (on success the window closes). */
+export function restartAsAdmin(selection: RunRequest): Promise<boolean> {
+  return invoke<boolean>("restart_as_admin", { selection });
+}
+
+/** The selection carried over by "Restart as administrator", if any. */
+export function takePendingSelection(): Promise<RunRequest | null> {
+  return invoke<RunRequest | null>("take_pending_selection");
 }
 
 export function startRun(

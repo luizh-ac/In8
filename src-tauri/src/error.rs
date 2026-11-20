@@ -6,6 +6,8 @@ pub enum Error {
     Catalog(String),
     #[error("Unknown app: {0}")]
     UnknownApp(String),
+    #[error("Unknown tweak or debloat item: {0}")]
+    UnknownItem(String),
     #[error("{0} isn't available on this system")]
     Unavailable(String),
     #[error("WSL: {0}")]

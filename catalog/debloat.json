@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "items": [
+    { "id": "clipchamp", "name": "Clipchamp", "description": "Video editor.", "level": "safe", "appx": ["Clipchamp.Clipchamp"] },
+    { "id": "news", "name": "Microsoft News", "description": "News feed app.", "level": "safe", "appx": ["Microsoft.BingNews"] },
+    { "id": "weather", "name": "Weather", "description": "MSN Weather app.", "level": "safe", "appx": ["Microsoft.BingWeather"] },
+    { "id": "bing-search", "name": "Bing Search", "description": "Bing search app and web results helper.", "level": "safe", "appx": ["Microsoft.BingSearch"] },
+    { "id": "solitaire", "name": "Solitaire Collection", "description": "Card games with ads.", "level": "safe", "appx": ["Microsoft.MicrosoftSolitaireCollection"] },
+    { "id": "tips", "name": "Tips", "description": "Windows tips app.", "level": "safe", "appx": ["Microsoft.Getstarted"] },
+    { "id": "get-help", "name": "Get Help", "description": "Microsoft support app.", "level": "safe", "appx": ["Microsoft.GetHelp"] },
+    { "id": "feedback-hub", "name": "Feedback Hub", "description": "Send feedback to Microsoft.", "level": "safe", "appx": ["Microsoft.WindowsFeedbackHub"] },
+    { "id": "maps", "name": "Maps", "description": "Windows Maps (discontinued).", "level": "safe", "appx": ["Microsoft.WindowsMaps"] },
+    { "id": "todo", "name": "Microsoft To Do", "description": "Task list app.", "level": "safe", "appx": ["Microsoft.Todos"] },
+    { "id": "power-automate", "name": "Power Automate", "description": "Desktop automation app.", "level": "safe", "appx": ["Microsoft.PowerAutomateDesktop"] },
+    { "id": "family", "name": "Microsoft Family", "description": "Family Safety app.", "level": "safe", "appx": ["MicrosoftCorporationII.MicrosoftFamily"] },
+    { "id": "office-hub", "name": "Microsoft 365 (Office) app", "description": "Launcher for Office web apps and offers.", "level": "safe", "appx": ["Microsoft.MicrosoftOfficeHub"] },
+    { "id": "cortana", "name": "Cortana", "description": "Discontinued assistant.", "level": "safe", "appx": ["Microsoft.549981C3F5F10"] },
+    { "id": "dev-home", "name": "Dev Home", "description": "Discontinued developer dashboard.", "level": "safe", "appx": ["Microsoft.Windows.DevHome"] },
+    {
+      "id": "xbox",
+      "name": "Xbox apps",
+      "description": "Xbox app, Game Bar and their helpers. Game Pass, some PC games and Win+G recording need them.",
+      "level": "advanced",
+      "appx": [
+        "Microsoft.GamingApp",
+        "Microsoft.XboxGamingOverlay",
+        "Microsoft.XboxIdentityProvider",
+        "Microsoft.XboxSpeechToTextOverlay",
+        "Microsoft.Xbox.TCUI"
+      ]
+    },
+    {
+      "id": "onedrive",
+      "name": "OneDrive",
+      "description": "Uninstalls the OneDrive app. Files already in the cloud stay there; files only on this PC stay on this PC.",
+      "level": "advanced",
+      "winget": "Microsoft.OneDrive"
+    },
+    {
+      "id": "copilot",
+      "name": "Copilot",
+      "description": "The Copilot app. Hide its taskbar button in Tweaks.",
+      "level": "advanced",
+      "appx": ["Microsoft.Copilot", "Microsoft.Windows.Ai.Copilot.Provider"]
+    },
+    {
+      "id": "outlook-mail",
+      "name": "Outlook (new) and Mail",
+      "description": "The Outlook app that comes with Windows and the old Mail and Calendar.",
+      "level": "advanced",
+      "appx": ["Microsoft.OutlookForWindows", "microsoft.windowscommunicationsapps"]
+    }
+  ]
+}

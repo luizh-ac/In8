@@ -1,5 +1,7 @@
 mod catalog;
 mod commands;
+mod debloat;
+mod elevation;
 mod error;
 mod exec;
 mod ini;
@@ -8,6 +10,8 @@ mod pm;
 mod profiles;
 mod resolve;
 mod runner;
+mod settings;
+mod tweaks;
 mod wsl;
 
 use std::sync::atomic::AtomicBool;
@@ -27,12 +31,32 @@ pub fn run() {
                         .build(),
                 )?;
             }
-            let catalog = Arc::new(catalog::Catalog::load_embedded()?);
-            let builtin_profiles = profiles::builtin(&catalog)?;
             let config_dir = app.path().config_dir()?.join("in8");
+            let settings = settings::SettingsStore::new(&config_dir);
             let platform = platform::PlatformInfo::detect();
+
+            let elevated = elevation::is_elevated();
+            let mut elevation_declined = false;
+            if platform.os == platform::Os::Windows && settings.load().always_admin && !elevated {
+                if cfg!(debug_assertions) {
+                    // `tauri dev` stops the dev server when this process exits, so the elevated copy
+                    // would open a blank window. Test the setting with a release build.
+                    log::info!("\"Always run as administrator\" is on, but ignored in dev builds");
+                } else {
+                    match elevation::relaunch_elevated(&[]) {
+                        Ok(elevation::Relaunch::Started) => std::process::exit(0),
+                        Ok(elevation::Relaunch::Declined) => elevation_declined = true,
+                        Err(error) => log::warn!("couldn't relaunch as administrator: {error}"),
+                    }
+                }
+            }
+
+            let catalog = Arc::new(catalog::Catalog::load_embedded()?);
+            let tweak_catalog = Arc::new(tweaks::TweakCatalog::load_embedded()?);
+            let debloat_catalog = Arc::new(debloat::DebloatCatalog::load_embedded()?);
+            let builtin_profiles = profiles::builtin(&catalog, &tweak_catalog, &debloat_catalog)?;
             log::info!(
-                "In8 {} on {:?}, managers: {:?}",
+                "In8 {} on {:?}, managers: {:?}, elevated: {elevated}",
                 platform.version,
                 platform.os,
                 platform.managers
@@ -47,6 +71,16 @@ pub fn run() {
                     builtin: builtin_profiles,
                     user: Mutex::new(profiles::UserProfiles::new(&config_dir)),
                 }),
+                tweaks: tweak_catalog,
+                debloat: debloat_catalog,
+                tweak_state: Arc::new(tweaks::TweakState::new(&config_dir)),
+                settings: Mutex::new(settings),
+                admin: commands::AdminStatus {
+                    elevated,
+                    declined: elevation_declined,
+                    can_elevate: cfg!(windows),
+                },
+                pending_selection: config_dir.join("pending-selection.json"),
             });
             Ok(())
         })
@@ -67,6 +101,13 @@ pub fn run() {
             commands::delete_profile,
             commands::export_backup,
             commands::import_backup,
+            commands::get_tweaks,
+            commands::get_debloat,
+            commands::get_settings,
+            commands::save_settings,
+            commands::get_admin_status,
+            commands::restart_as_admin,
+            commands::take_pending_selection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the In8 application");

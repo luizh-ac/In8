@@ -4,7 +4,20 @@
     {
       "id": "my-setup",
       "name": "My setup",
-      "description": "Everything in the catalog, with the dev tools inside WSL.",
+      "description": "Everything in the catalog with the dev tools inside WSL, every tweak and the basic debloat list.",
+      "tweaks": [
+        "dark-mode", "show-file-extensions", "show-hidden-files", "explorer-opens-this-pc", "classic-context-menu",
+        "taskbar-left", "hide-widgets", "hide-task-view", "hide-search-box", "hide-copilot-button", "taskbar-end-task",
+        "no-web-search-in-start", "no-start-recommendations",
+        "required-diagnostic-data", "no-advertising-id", "no-tailored-experiences", "no-suggestions",
+        "no-lock-screen-tips", "no-activity-history",
+        "game-mode", "no-mouse-acceleration", "high-performance-power",
+        "gnome-dark-mode", "gnome-window-buttons", "gnome-battery-percentage", "gnome-clock-weekday"
+      ],
+      "debloat": [
+        "clipchamp", "news", "weather", "bing-search", "solitaire", "tips", "get-help", "feedback-hub", "maps",
+        "todo", "power-automate", "family", "office-hub", "cortana", "dev-home"
+      ],
       "apps": [
         { "id": "chrome" },
         { "id": "brave" },

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { exportBackup, importBackup } from "../api";
-  import { message, store, type ApplyResult } from "../store.svelte";
+  import { message, profileSelection, store, type ApplyResult } from "../store.svelte";
   import { text, wslActionLabel } from "../strings";
   import type { ProfileEntry } from "../types";
 
@@ -39,7 +39,7 @@
   }
 
   function apply(profile: ProfileEntry): void {
-    show(describe(store.applySelection(profile)));
+    show(describe(store.applySelection(profileSelection(profile))));
   }
 
   function captureThisPc(): void {
@@ -107,7 +107,12 @@
         {#if profile.description}
           <p class="mt-0.5 text-sm text-zinc-500">{profile.description}</p>
         {/if}
-        <p class="mt-1 text-xs text-zinc-400">{t.counts(profile.apps.length, store.isWindows ? profile.wsl.length : 0)}</p>
+        <p class="mt-1 text-xs text-zinc-400">{t.counts(
+            profile.apps.length,
+            store.isWindows ? profile.wsl.length : 0,
+            profile.tweaks.filter((id) => store.tweaks.some((tweak) => tweak.id === id)).length,
+            store.isWindows ? profile.debloat.length : 0,
+          )}</p>
       </div>
       <button
         type="button"

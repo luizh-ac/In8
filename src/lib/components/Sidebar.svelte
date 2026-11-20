@@ -13,7 +13,7 @@
         ["postinstall", text.nav.postinstall],
         ["settings", text.nav.settings],
       ] as [View, string][]
-    ).filter(([view]) => view !== "wsl" || store.platform?.os === "windows"),
+    ).filter(([view]) => (view !== "wsl" && view !== "debloat") || store.platform?.os === "windows"),
   );
 
   const platformLine = $derived.by(() => {

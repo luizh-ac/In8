@@ -1,0 +1,289 @@
+{
+  "version": 1,
+  "tweaks": [
+    {
+      "id": "dark-mode",
+      "os": "windows",
+      "category": "appearance",
+      "name": "Dark mode",
+      "description": "Dark theme for Windows and apps.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "value": "AppsUseLightTheme", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "value": "SystemUsesLightTheme", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "show-file-extensions",
+      "os": "windows",
+      "category": "explorer",
+      "name": "Show file extensions",
+      "description": "Show .exe, .pdf and other extensions in File Explorer.",
+      "signOut": true,
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "value": "HideFileExt", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "show-hidden-files",
+      "os": "windows",
+      "category": "explorer",
+      "name": "Show hidden files",
+      "description": "Show hidden files and folders in File Explorer.",
+      "signOut": true,
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "value": "Hidden", "data": { "dword": 1 } }
+      ]
+    },
+    {
+      "id": "explorer-opens-this-pc",
+      "os": "windows",
+      "category": "explorer",
+      "name": "Open File Explorer to This PC",
+      "description": "Start in This PC instead of Home.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "value": "LaunchTo", "data": { "dword": 1 } }
+      ]
+    },
+    {
+      "id": "classic-context-menu",
+      "os": "windows",
+      "category": "explorer",
+      "name": "Classic right-click menu",
+      "description": "Show the full Windows 10 menu without \"Show more options\".",
+      "signOut": true,
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Classes\\CLSID\\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\\InprocServer32", "value": "", "data": { "string": "" } }
+      ]
+    },
+    {
+      "id": "taskbar-left",
+      "os": "windows",
+      "category": "taskbar",
+      "name": "Taskbar aligned left",
+      "description": "Start button and apps on the left, like Windows 10.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "value": "TaskbarAl", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "hide-widgets",
+      "os": "windows",
+      "category": "taskbar",
+      "name": "Turn off Widgets",
+      "description": "Remove the Widgets board and its taskbar button (news and weather).",
+      "signOut": true,
+      "actions": [
+        { "type": "registry", "hive": "HKLM", "key": "SOFTWARE\\Policies\\Microsoft\\Dsh", "value": "AllowNewsAndInterests", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "hide-task-view",
+      "os": "windows",
+      "category": "taskbar",
+      "name": "Hide Task View button",
+      "description": "Win+Tab still works.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "value": "ShowTaskViewButton", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "hide-search-box",
+      "os": "windows",
+      "category": "taskbar",
+      "name": "Hide taskbar search",
+      "description": "Press the Windows key and type to search.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Search", "value": "SearchboxTaskbarMode", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "hide-copilot-button",
+      "os": "windows",
+      "category": "taskbar",
+      "name": "Hide Copilot button",
+      "description": "Remove the Copilot button from the taskbar.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "value": "ShowCopilotButton", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "taskbar-end-task",
+      "os": "windows",
+      "category": "taskbar",
+      "name": "End task on right-click",
+      "description": "Close a frozen app from its taskbar button.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarDeveloperSettings", "value": "TaskbarEndTask", "data": { "dword": 1 } }
+      ]
+    },
+    {
+      "id": "no-web-search-in-start",
+      "os": "windows",
+      "category": "taskbar",
+      "name": "No Bing results in Start",
+      "description": "Start search shows only your apps, files and settings.",
+      "signOut": true,
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Policies\\Microsoft\\Windows\\Explorer", "value": "DisableSearchBoxSuggestions", "data": { "dword": 1 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Search", "value": "BingSearchEnabled", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "no-start-recommendations",
+      "os": "windows",
+      "category": "taskbar",
+      "name": "Fewer Start recommendations",
+      "description": "No tips, promoted apps or recent files in Start.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "value": "Start_IrisRecommendations", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "value": "Start_TrackDocs", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "required-diagnostic-data",
+      "os": "windows",
+      "category": "privacy",
+      "name": "Only required diagnostic data",
+      "description": "Send Microsoft the minimum telemetry Windows allows on Home and Pro.",
+      "actions": [
+        { "type": "registry", "hive": "HKLM", "key": "SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection", "value": "AllowTelemetry", "data": { "dword": 1 } }
+      ]
+    },
+    {
+      "id": "no-advertising-id",
+      "os": "windows",
+      "category": "privacy",
+      "name": "Turn off advertising ID",
+      "description": "Apps can't use an ID to show you personalized ads.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo", "value": "Enabled", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "no-tailored-experiences",
+      "os": "windows",
+      "category": "privacy",
+      "name": "No tailored experiences",
+      "description": "Microsoft doesn't use your diagnostic data for tips and offers.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Privacy", "value": "TailoredExperiencesWithDiagnosticDataEnabled", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "no-suggestions",
+      "os": "windows",
+      "category": "privacy",
+      "name": "No suggestions and ads",
+      "description": "No suggested apps in Start and Settings, no ads in File Explorer, no apps installed on their own.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "value": "SubscribedContent-338388Enabled", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "value": "SubscribedContent-338389Enabled", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "value": "SubscribedContent-353694Enabled", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "value": "SubscribedContent-353696Enabled", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "value": "SystemPaneSuggestionsEnabled", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "value": "SilentInstalledAppsEnabled", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "value": "SoftLandingEnabled", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "value": "ShowSyncProviderNotifications", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "no-lock-screen-tips",
+      "os": "windows",
+      "category": "privacy",
+      "name": "No lock screen tips",
+      "description": "No fun facts, tips and tricks on the lock screen.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "value": "RotatingLockScreenOverlayEnabled", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "value": "SubscribedContent-338387Enabled", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "no-activity-history",
+      "os": "windows",
+      "category": "privacy",
+      "name": "No activity history",
+      "description": "Windows doesn't keep or upload a history of the apps and files you use.",
+      "actions": [
+        { "type": "registry", "hive": "HKLM", "key": "SOFTWARE\\Policies\\Microsoft\\Windows\\System", "value": "PublishUserActivities", "data": { "dword": 0 } },
+        { "type": "registry", "hive": "HKLM", "key": "SOFTWARE\\Policies\\Microsoft\\Windows\\System", "value": "UploadUserActivities", "data": { "dword": 0 } }
+      ]
+    },
+    {
+      "id": "game-mode",
+      "os": "windows",
+      "category": "performance",
+      "name": "Game Mode on",
+      "description": "Windows prioritizes the game you're playing.",
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Software\\Microsoft\\GameBar", "value": "AutoGameModeEnabled", "data": { "dword": 1 } }
+      ]
+    },
+    {
+      "id": "no-mouse-acceleration",
+      "os": "windows",
+      "category": "performance",
+      "name": "Turn off mouse acceleration",
+      "description": "The pointer moves the same distance however fast you move the mouse (\"Enhance pointer precision\" off).",
+      "signOut": true,
+      "actions": [
+        { "type": "registry", "hive": "HKCU", "key": "Control Panel\\Mouse", "value": "MouseSpeed", "data": { "string": "0" } },
+        { "type": "registry", "hive": "HKCU", "key": "Control Panel\\Mouse", "value": "MouseThreshold1", "data": { "string": "0" } },
+        { "type": "registry", "hive": "HKCU", "key": "Control Panel\\Mouse", "value": "MouseThreshold2", "data": { "string": "0" } }
+      ]
+    },
+    {
+      "id": "high-performance-power",
+      "os": "windows",
+      "category": "performance",
+      "name": "High performance power plan",
+      "description": "Better for desktops; uses more power. Some laptops don't have this plan.",
+      "actions": [
+        { "type": "powerPlan", "scheme": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c" }
+      ]
+    },
+    {
+      "id": "gnome-dark-mode",
+      "os": "linux",
+      "desktop": "gnome",
+      "category": "appearance",
+      "name": "Dark mode",
+      "description": "Dark style for GNOME and apps that follow it.",
+      "actions": [
+        { "type": "gsettings", "schema": "org.gnome.desktop.interface", "key": "color-scheme", "value": "'prefer-dark'" }
+      ]
+    },
+    {
+      "id": "gnome-window-buttons",
+      "os": "linux",
+      "desktop": "gnome",
+      "category": "appearance",
+      "name": "Minimize and maximize buttons",
+      "description": "Show all three buttons on window title bars.",
+      "actions": [
+        { "type": "gsettings", "schema": "org.gnome.desktop.wm.preferences", "key": "button-layout", "value": "'appmenu:minimize,maximize,close'" }
+      ]
+    },
+    {
+      "id": "gnome-battery-percentage",
+      "os": "linux",
+      "desktop": "gnome",
+      "category": "taskbar",
+      "name": "Battery percentage",
+      "description": "Show the battery percentage in the top bar.",
+      "actions": [
+        { "type": "gsettings", "schema": "org.gnome.desktop.interface", "key": "show-battery-percentage", "value": "true" }
+      ]
+    },
+    {
+      "id": "gnome-clock-weekday",
+      "os": "linux",
+      "desktop": "gnome",
+      "category": "taskbar",
+      "name": "Weekday in the clock",
+      "description": "Show the day of the week next to the time.",
+      "actions": [
+        { "type": "gsettings", "schema": "org.gnome.desktop.interface", "key": "clock-show-weekday", "value": "true" }
+      ]
+    }
+  ]
+}

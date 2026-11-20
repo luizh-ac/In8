@@ -119,14 +119,23 @@ export interface AppRequest {
   target: Target;
 }
 
-/** What to run; also the selection stored in profiles and backups. */
+export interface TweakRequest {
+  id: string;
+  /** Restore the values saved when the tweak was applied. */
+  revert: boolean;
+}
+
+/** What to run; also the selection stored in backups. */
 export interface RunRequest {
   apps: AppRequest[];
   wsl: WslAction[];
+  tweaks: TweakRequest[];
+  /** Debloat item IDs to remove. */
+  debloat: string[];
 }
 
-// runner.rs ("done" is a setup step that finished, not an app install)
-export type TaskStatus = "succeeded" | "done" | "alreadyInstalled" | "failed" | "simulated";
+// runner.rs ("done": a setup step or tweak finished; "removed": a debloat item was uninstalled)
+export type TaskStatus = "succeeded" | "done" | "removed" | "alreadyInstalled" | "failed" | "simulated";
 
 export type RunEvent =
   | { event: "taskStarted"; taskId: string; label: string; command: string }
@@ -146,6 +155,10 @@ export interface Profile {
   description: string;
   apps: AppRequest[];
   wsl: WslAction[];
+  /** Tweak IDs to apply. */
+  tweaks: string[];
+  /** Debloat item IDs to remove. */
+  debloat: string[];
 }
 
 export interface ProfileEntry extends Profile {
@@ -159,4 +172,66 @@ export interface ImportResult {
   profiles: number;
   /** App IDs from the file that this version of In8 doesn't know. */
   unknownApps: string[];
+}
+
+// tweaks.rs
+export type TweakCategory = "appearance" | "explorer" | "taskbar" | "privacy" | "performance";
+
+export type TweakAction =
+  | { type: "registry"; hive: "HKCU" | "HKLM"; key: string; value: string; data: { dword: number } | { string: string } }
+  | { type: "powerPlan"; scheme: string }
+  | { type: "gsettings"; schema: string; key: string; value: string };
+
+export interface Tweak {
+  id: string;
+  os: "windows" | "linux";
+  desktop?: string;
+  category: TweakCategory;
+  name: string;
+  description: string;
+  /** Shows up fully only after signing out. */
+  signOut: boolean;
+  actions: TweakAction[];
+}
+
+export interface TweakInfo extends Tweak {
+  requiresAdmin: boolean;
+  /** Every value already matches the tweak. */
+  applied: boolean;
+  /** In8 saved the previous values, so it can revert. */
+  revertible: boolean;
+}
+
+// debloat.rs
+export interface DebloatItem {
+  id: string;
+  name: string;
+  description: string;
+  /** "advanced" items can break something someone uses; the run screen asks first. */
+  level: "safe" | "advanced";
+  appx?: string[];
+  winget?: string;
+}
+
+export interface DebloatInfo extends DebloatItem {
+  installed: boolean;
+}
+
+// settings.rs
+export type Theme = "system" | "light" | "dark";
+
+export interface Settings {
+  /** Windows only: relaunch through UAC on start. */
+  alwaysAdmin: boolean;
+  dryRunByDefault: boolean;
+  theme: Theme;
+  wslDistro: string | null;
+}
+
+// commands.rs
+export interface AdminStatus {
+  elevated: boolean;
+  /** "Always run as administrator" is on but UAC was declined at start. */
+  declined: boolean;
+  canElevate: boolean;
 }

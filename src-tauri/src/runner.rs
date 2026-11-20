@@ -3,17 +3,19 @@
 
 use std::collections::HashSet;
 use std::io::{Read, Write};
-use std::sync::mpsc;
+use std::sync::{Arc, mpsc};
 use std::thread;
 
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{App, Catalog, Target};
+use crate::debloat::{self, DebloatCatalog};
 use crate::error::{Error, Result};
 use crate::exec::Cmd;
 use crate::platform::{Os, PlatformInfo};
 use crate::pm::{self, InstallAction, InstallOutcome, PmId, apt, github};
 use crate::resolve::{Resolution, resolve, resolve_wsl};
+use crate::tweaks::{self, TweakCatalog, TweakJob, TweakState};
 use crate::wsl::{self, DistroDetails, WslAction};
 
 #[derive(Debug, Clone)]
@@ -28,6 +30,8 @@ pub struct Task {
 pub enum TaskKind {
     Setup,
     Install(PmId),
+    /// Debloat: uninstalling something.
+    Remove,
 }
 
 /// Mirrored in `src/lib/types.ts` (`TaskStatus`).
@@ -35,8 +39,10 @@ pub enum TaskKind {
 #[serde(rename_all = "camelCase")]
 pub enum TaskStatus {
     Succeeded,
-    /// A setup step (not an app install) that finished.
+    /// A setup step or tweak (not an app install) that finished.
     Done,
+    /// A debloat item that was uninstalled.
+    Removed,
     AlreadyInstalled,
     Failed,
     Simulated,
@@ -85,6 +91,20 @@ pub struct RunRequest {
     pub apps: Vec<AppRequest>,
     #[serde(default)]
     pub wsl: Vec<WslAction>,
+    #[serde(default)]
+    pub tweaks: Vec<TweakRequest>,
+    /// Debloat item IDs to remove.
+    #[serde(default)]
+    pub debloat: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TweakRequest {
+    pub id: String,
+    /// Restore the values saved when the tweak was applied.
+    #[serde(default)]
+    pub revert: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -155,6 +175,71 @@ pub fn plan(
     tasks.extend(host_installs);
     tasks.extend(plan_wsl(platform, distro, &wsl_apps, &request.wsl)?);
     Ok(tasks)
+}
+
+/// Catalogs and saved state for debloat and tweaks.
+pub struct SystemContext<'a> {
+    pub tweaks: &'a TweakCatalog,
+    pub debloat: &'a DebloatCatalog,
+    pub state: &'a Arc<TweakState>,
+}
+
+/// Debloat tasks (run before installs) and tweak tasks (run after everything else).
+pub fn plan_system(
+    context: &SystemContext,
+    platform: &PlatformInfo,
+    request: &RunRequest,
+) -> Result<(Vec<Task>, Vec<Task>)> {
+    let mut removals = Vec::new();
+    let mut seen = HashSet::new();
+    for id in &request.debloat {
+        if !seen.insert(id.as_str()) {
+            continue;
+        }
+        let item = context
+            .debloat
+            .get(id)
+            .ok_or_else(|| Error::UnknownItem(id.clone()))?;
+        if platform.os != Os::Windows {
+            return Err(Error::Unavailable(item.name.clone()));
+        }
+        removals.push(Task {
+            id: format!("debloat-{id}"),
+            label: format!("Remove {}", item.name),
+            action: InstallAction::Command(debloat::remove_cmd(item)),
+            kind: TaskKind::Remove,
+        });
+    }
+
+    let mut tweak_tasks = Vec::new();
+    let mut seen = HashSet::new();
+    for wanted in &request.tweaks {
+        if !seen.insert(wanted.id.as_str()) {
+            continue;
+        }
+        let tweak = context
+            .tweaks
+            .get(&wanted.id)
+            .ok_or_else(|| Error::UnknownItem(wanted.id.clone()))?;
+        if !tweaks::supported(tweak, platform) {
+            return Err(Error::Unavailable(tweak.name.clone()));
+        }
+        tweak_tasks.push(Task {
+            id: format!("tweak-{}", tweak.id),
+            label: if wanted.revert {
+                format!("Revert: {}", tweak.name)
+            } else {
+                tweak.name.clone()
+            },
+            action: InstallAction::Tweak(Box::new(TweakJob {
+                tweak: tweak.clone(),
+                revert: wanted.revert,
+                state: Arc::clone(context.state),
+            })),
+            kind: TaskKind::Setup,
+        });
+    }
+    Ok((removals, tweak_tasks))
 }
 
 fn plan_wsl(
@@ -323,6 +408,21 @@ fn execute(task: &Task, emit: &mut impl FnMut(RunEvent)) -> (TaskStatus, Option<
     };
     let code = match &task.action {
         InstallAction::Command(cmd) => run_process(&task.id, cmd, emit),
+        InstallAction::Tweak(job) => {
+            let mut log = |line: String| emit(output(line));
+            let result = if job.revert {
+                tweaks::revert(&job.tweak, &job.state, &mut log)
+            } else {
+                tweaks::apply(&job.tweak, &job.state, &mut log)
+            };
+            return match result {
+                Ok(()) => (TaskStatus::Done, Some(0)),
+                Err(message) => {
+                    emit(output(message));
+                    (TaskStatus::Failed, None)
+                }
+            };
+        }
         InstallAction::GithubRelease(package) => {
             // The downloaded file and its folder are deleted when `download` is dropped.
             let download = match github::download(package, |line| emit(output(line))) {
@@ -413,6 +513,8 @@ fn run_process(task_id: &str, cmd: &Cmd, emit: &mut impl FnMut(RunEvent)) -> Opt
 fn status_for(kind: TaskKind, code: Option<i32>) -> TaskStatus {
     let outcome = match kind {
         TaskKind::Setup if code == Some(0) => return TaskStatus::Done,
+        TaskKind::Remove if code == Some(0) => return TaskStatus::Removed,
+        TaskKind::Remove => InstallOutcome::Failed,
         TaskKind::Setup => InstallOutcome::Failed,
         TaskKind::Install(manager) => pm::interpret_exit(manager, code),
     };
@@ -514,6 +616,7 @@ mod tests {
                 })
                 .collect(),
             wsl: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -629,12 +732,49 @@ mod tests {
         let docker = RunRequest {
             apps: Vec::new(),
             wsl: vec![WslAction::DockerEngine],
+            ..Default::default()
         };
         assert!(matches!(
             plan(&catalog, &windows(), Some(&ubuntu(false)), &docker),
             Err(Error::Wsl(_))
         ));
         assert!(plan(&catalog, &windows(), Some(&ubuntu(true)), &docker).is_ok());
+    }
+
+    #[test]
+    fn plans_debloat_and_tweaks_once_each() {
+        let tweaks = TweakCatalog::load_embedded().unwrap();
+        let debloat = DebloatCatalog::load_embedded().unwrap();
+        let state = Arc::new(TweakState::new(
+            &std::env::temp_dir().join("in8-plan-system"),
+        ));
+        let context = SystemContext {
+            tweaks: &tweaks,
+            debloat: &debloat,
+            state: &state,
+        };
+        let tweak = |id: &str, revert: bool| TweakRequest {
+            id: id.into(),
+            revert,
+        };
+        let request = RunRequest {
+            tweaks: vec![tweak("dark-mode", false), tweak("dark-mode", true)],
+            debloat: vec!["clipchamp".into(), "clipchamp".into()],
+            ..Default::default()
+        };
+        let (removals, tweak_tasks) = plan_system(&context, &windows(), &request).unwrap();
+        assert_eq!(task_ids(&removals), ["debloat-clipchamp"]);
+        assert_eq!(task_ids(&tweak_tasks), ["tweak-dark-mode"]);
+        assert!(plan_system(&context, &platform(Os::Linux, &[]), &request).is_err());
+
+        let unknown = RunRequest {
+            debloat: vec!["nope".into()],
+            ..Default::default()
+        };
+        assert!(matches!(
+            plan_system(&context, &windows(), &unknown),
+            Err(Error::UnknownItem(_))
+        ));
     }
 
     #[test]
@@ -645,6 +785,7 @@ mod tests {
             wsl: vec![WslAction::InstallDistro {
                 distro: distro.into(),
             }],
+            ..Default::default()
         };
         assert!(
             plan(

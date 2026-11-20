@@ -1572,6 +1572,8 @@ dependencies = [
  "tauri-plugin-log",
  "thiserror 2.0.21",
  "ureq",
+ "windows-sys 0.61.2",
+ "winreg",
 ]
 
 [[package]]

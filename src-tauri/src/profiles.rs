@@ -9,8 +9,10 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Catalog, Target};
+use crate::debloat::DebloatCatalog;
 use crate::error::{Error, Result};
-use crate::runner::{AppRequest, RunRequest};
+use crate::runner::{AppRequest, RunRequest, TweakRequest};
+use crate::tweaks::TweakCatalog;
 use crate::wsl::{self, WslAction};
 
 const EMBEDDED_PROFILES: &str = include_str!("../../catalog/profiles.json");
@@ -34,6 +36,12 @@ pub struct Profile {
     pub apps: Vec<AppRequest>,
     #[serde(default)]
     pub wsl: Vec<WslAction>,
+    /// Tweak IDs to apply.
+    #[serde(default)]
+    pub tweaks: Vec<String>,
+    /// Debloat item IDs to remove.
+    #[serde(default)]
+    pub debloat: Vec<String>,
 }
 
 /// A profile as the frontend sees it. Mirrored in `src/lib/types.ts` (`ProfileEntry`).
@@ -80,8 +88,12 @@ fn invalid(profile: &str, reason: impl std::fmt::Display) -> Error {
     Error::Profile(format!("profile \"{profile}\": {reason}"))
 }
 
-/// Built-in profiles, checked against the catalog. Any mistake is a bug in the shipped data.
-pub fn builtin(catalog: &Catalog) -> Result<Vec<Profile>> {
+/// Built-in profiles, checked against the catalogs. Any mistake is a bug in the shipped data.
+pub fn builtin(
+    catalog: &Catalog,
+    tweaks: &TweakCatalog,
+    debloat: &DebloatCatalog,
+) -> Result<Vec<Profile>> {
     let file: ProfileFile =
         serde_json::from_str(EMBEDDED_PROFILES).map_err(|e| Error::Profile(e.to_string()))?;
     let mut ids = HashSet::new();
@@ -108,6 +120,12 @@ pub fn builtin(catalog: &Catalog) -> Result<Vec<Profile>> {
         if clean != selection_of(profile) {
             return Err(invalid(&profile.id, "a target or WSL action isn't valid"));
         }
+        if let Some(id) = profile.tweaks.iter().find(|id| tweaks.get(id).is_none()) {
+            return Err(invalid(&profile.id, format!("unknown tweak {id}")));
+        }
+        if let Some(id) = profile.debloat.iter().find(|id| debloat.get(id).is_none()) {
+            return Err(invalid(&profile.id, format!("unknown debloat item {id}")));
+        }
     }
     Ok(file.profiles)
 }
@@ -116,6 +134,34 @@ fn selection_of(profile: &Profile) -> RunRequest {
     RunRequest {
         apps: profile.apps.clone(),
         wsl: profile.wsl.clone(),
+        tweaks: profile
+            .tweaks
+            .iter()
+            .map(|id| TweakRequest {
+                id: id.clone(),
+                revert: false,
+            })
+            .collect(),
+        debloat: profile.debloat.clone(),
+    }
+}
+
+impl Profile {
+    fn from_selection(
+        id: String,
+        name: String,
+        description: String,
+        selection: RunRequest,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            description,
+            apps: selection.apps,
+            wsl: selection.wsl,
+            tweaks: selection.tweaks.into_iter().map(|t| t.id).collect(),
+            debloat: selection.debloat,
+        }
     }
 }
 
@@ -155,7 +201,40 @@ pub fn sanitize_selection(catalog: &Catalog, selection: &RunRequest) -> (RunRequ
             actions.push(action.clone());
         }
     }
-    (RunRequest { apps, wsl: actions }, unknown)
+    // Reverts only make sense on the machine where the tweak was applied, so they never travel.
+    let mut tweaks: Vec<TweakRequest> = Vec::new();
+    for wanted in selection.tweaks.iter().filter(|t| !t.revert) {
+        if is_item_id(&wanted.id) && !tweaks.iter().any(|t| t.id == wanted.id) {
+            tweaks.push(TweakRequest {
+                id: wanted.id.clone(),
+                revert: false,
+            });
+        }
+    }
+    let mut debloat: Vec<String> = Vec::new();
+    for id in &selection.debloat {
+        if is_item_id(id) && !debloat.contains(id) {
+            debloat.push(id.clone());
+        }
+    }
+    (
+        RunRequest {
+            apps,
+            wsl: actions,
+            tweaks,
+            debloat,
+        },
+        unknown,
+    )
+}
+
+/// Tweak and debloat IDs are checked against their catalogs when they're used; here only their shape.
+fn is_item_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 /// `user-` plus a slug of the name, so saving under the same name replaces that profile.
@@ -188,13 +267,12 @@ fn clean_name(name: &str) -> Result<String> {
 fn sanitize_user_profile(catalog: &Catalog, profile: &Profile) -> Option<Profile> {
     let name = clean_name(&profile.name).ok()?;
     let (selection, _) = sanitize_selection(catalog, &selection_of(profile));
-    Some(Profile {
-        id: user_id(&name),
+    Some(Profile::from_selection(
+        user_id(&name),
         name,
-        description: profile.description.chars().take(200).collect(),
-        apps: selection.apps,
-        wsl: selection.wsl,
-    })
+        profile.description.chars().take(200).collect(),
+        selection,
+    ))
 }
 
 fn read_small_file(path: &Path) -> Result<String> {
@@ -257,17 +335,15 @@ impl UserProfiles {
     pub fn save(&self, catalog: &Catalog, name: &str, selection: &RunRequest) -> Result<()> {
         let name = clean_name(name)?;
         let (selection, _) = sanitize_selection(catalog, selection);
-        if selection.apps.is_empty() && selection.wsl.is_empty() {
+        if selection.apps.is_empty()
+            && selection.wsl.is_empty()
+            && selection.tweaks.is_empty()
+            && selection.debloat.is_empty()
+        {
             return Err(Error::Profile("select something to save first".into()));
         }
         let mut profiles = self.load(catalog)?;
-        let profile = Profile {
-            id: user_id(&name),
-            name,
-            description: String::new(),
-            apps: selection.apps,
-            wsl: selection.wsl,
-        };
+        let profile = Profile::from_selection(user_id(&name), name, String::new(), selection);
         match profiles.iter_mut().find(|p| p.id == profile.id) {
             Some(existing) => *existing = profile,
             None => profiles.push(profile),
@@ -366,12 +442,18 @@ mod tests {
                 })
                 .collect(),
             wsl,
+            ..Default::default()
         }
     }
 
     #[test]
     fn builtin_profiles_are_valid() {
-        let profiles = builtin(&catalog()).expect("built-in profiles should be valid");
+        let profiles = builtin(
+            &catalog(),
+            &TweakCatalog::load_embedded().unwrap(),
+            &DebloatCatalog::load_embedded().unwrap(),
+        )
+        .expect("built-in profiles should be valid");
         assert!(profiles.iter().any(|p| p.id == "dev-on-wsl"));
         assert!(profiles.iter().any(|p| p.id == "my-setup"));
     }
@@ -379,7 +461,12 @@ mod tests {
     #[test]
     fn my_setup_has_every_catalog_app() {
         let catalog = catalog();
-        let profiles = builtin(&catalog).unwrap();
+        let profiles = builtin(
+            &catalog,
+            &TweakCatalog::load_embedded().unwrap(),
+            &DebloatCatalog::load_embedded().unwrap(),
+        )
+        .unwrap();
         let mine = profiles.iter().find(|p| p.id == "my-setup").unwrap();
         for app in &catalog.apps {
             assert!(

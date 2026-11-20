@@ -2,26 +2,38 @@
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import {
   deleteProfile,
+  getAdminStatus,
   getCatalog,
+  getDebloat,
   getInstalled,
   getPlatform,
   getProfiles,
+  getSettings,
+  getTweaks,
   getWslInstalled,
   getWslStatus,
+  restartAsAdmin,
   saveProfile,
+  saveSettings,
   startRun,
+  takePendingSelection,
 } from "./api";
 import { wslActionLabel } from "./strings";
 import type {
+  AdminStatus,
   CatalogApp,
+  DebloatInfo,
   PlatformInfo,
+  Profile,
   ProfileEntry,
   Resolution,
   RunEvent,
   RunRequest,
   RunSummary,
+  Settings,
   Target,
   TaskStatus,
+  TweakInfo,
   WslAction,
   WslStatus,
 } from "./types";
@@ -39,6 +51,8 @@ export type View =
 /** WSL actions that are simple on/off choices (installing a distro also needs a name). */
 export type WslToggle = "installWsl" | "enableSystemd" | "dockerEngine" | "vscodeExtension";
 
+export type TweakChoice = "apply" | "revert";
+
 export interface TaskState {
   id: string;
   label: string;
@@ -52,7 +66,7 @@ export interface TaskState {
 export interface ApplyResult {
   /** Items newly added to the selection. */
   selected: number;
-  /** Names of apps and WSL options left out because they're already there. */
+  /** Names of apps, tweaks and WSL options left out because they're already there. */
   alreadyInstalled: string[];
   /** Names of apps that can't be installed on this system. */
   skipped: string[];
@@ -64,8 +78,25 @@ const MAX_LINES_PER_TASK = 500;
 /** Apps the "Dev tools on WSL" shortcut moves into WSL. */
 export const DEV_ON_WSL = ["git", "nodejs", "python", "rust"];
 
+const DEFAULT_SETTINGS: Settings = {
+  alwaysAdmin: false,
+  dryRunByDefault: true,
+  theme: "system",
+  wslDistro: null,
+};
+
 export function message(error: unknown): string {
   return typeof error === "string" ? error : error instanceof Error ? error.message : String(error);
+}
+
+/** A profile in the shape of a selection (profiles only ever apply tweaks, never revert). */
+export function profileSelection(profile: Profile): RunRequest {
+  return {
+    apps: profile.apps,
+    wsl: profile.wsl,
+    tweaks: profile.tweaks.map((id) => ({ id, revert: false })),
+    debloat: profile.debloat,
+  };
 }
 
 class AppStore {
@@ -75,6 +106,9 @@ class AppStore {
   platform = $state<PlatformInfo | null>(null);
   catalog = $state<CatalogApp[]>([]);
   loadError = $state<string | null>(null);
+
+  settings = $state<Settings>({ ...DEFAULT_SETTINGS });
+  admin = $state<AdminStatus>({ elevated: false, declined: false, canElevate: false });
 
   installed = new SvelteSet<string>();
   installedWsl = new SvelteSet<string>();
@@ -90,6 +124,16 @@ class AppStore {
   wslToggles = new SvelteSet<WslToggle>();
   distroToInstall = $state<string | null>(null);
 
+  tweaks = $state<TweakInfo[]>([]);
+  checkingTweaks = $state(false);
+  tweakError = $state<string | null>(null);
+  tweakChoices = new SvelteMap<string, TweakChoice>();
+
+  debloatItems = $state<DebloatInfo[]>([]);
+  checkingDebloat = $state(false);
+  debloatError = $state<string | null>(null);
+  debloatSelected = new SvelteSet<string>();
+
   profiles = $state<ProfileEntry[]>([]);
   profileError = $state<string | null>(null);
 
@@ -101,6 +145,8 @@ class AppStore {
 
   isWindows = $derived(this.platform?.os === "windows");
   selectedApps = $derived(this.catalog.filter((app) => this.selected.has(app.id)));
+  selectedTweaks = $derived(this.tweaks.filter((tweak) => this.tweakChoices.has(tweak.id)));
+  selectedDebloat = $derived(this.debloatItems.filter((item) => this.debloatSelected.has(item.id)));
 
   pendingWslActions = $derived.by((): WslAction[] => {
     const actions: WslAction[] = [];
@@ -112,7 +158,14 @@ class AppStore {
     return actions;
   });
 
-  selectionCount = $derived(this.selected.size + this.pendingWslActions.length);
+  selectionCount = $derived(
+    this.selected.size + this.pendingWslActions.length + this.tweakChoices.size + this.debloatSelected.size,
+  );
+
+  /** A selected tweak writes to HKLM and In8 isn't elevated (Windows only). */
+  needsAdmin = $derived(
+    this.admin.canElevate && !this.admin.elevated && this.selectedTweaks.some((tweak) => tweak.requiresAdmin),
+  );
 
   targetOf(app: CatalogApp): Target {
     return this.targets.get(app.id) ?? "host";
@@ -132,14 +185,50 @@ class AppStore {
 
   async load(): Promise<void> {
     try {
-      const [platform, catalog] = await Promise.all([getPlatform(), getCatalog()]);
+      const [platform, catalog, settings, admin] = await Promise.all([
+        getPlatform(),
+        getCatalog(),
+        getSettings(),
+        getAdminStatus(),
+      ]);
       this.platform = platform;
       this.catalog = catalog;
+      this.settings = settings;
+      this.admin = admin;
+      this.dryRun = settings.dryRunByDefault;
     } catch (error) {
       this.loadError = message(error);
       return;
     }
-    await Promise.all([this.refreshInstalled(), this.refreshWsl(), this.loadProfiles()]);
+    this.applyTheme();
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applyTheme());
+    await Promise.all([
+      this.refreshInstalled(),
+      this.refreshWsl(this.settings.wslDistro ?? undefined),
+      this.loadProfiles(),
+      this.refreshTweaks(),
+      this.refreshDebloat(),
+    ]);
+    // Coming back from "Restart as administrator": restore the selection and go straight to review.
+    const pending = await takePendingSelection().catch(() => null);
+    if (pending) {
+      this.restoreSelection(pending);
+      this.previousView = "apps";
+      this.view = "run";
+    }
+  }
+
+  applyTheme(): void {
+    const theme = this.settings.theme;
+    const dark =
+      theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.classList.toggle("dark", dark);
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+  }
+
+  async updateSettings(patch: Partial<Settings>): Promise<void> {
+    this.settings = await saveSettings({ ...this.settings, ...patch });
+    this.applyTheme();
   }
 
   async refreshInstalled(): Promise<void> {
@@ -170,10 +259,48 @@ class AppStore {
       for (const app of this.selectedApps) {
         if (!this.isAvailable(app)) this.selected.delete(app.id);
       }
+      // Remember the distro the user works with.
+      const active = this.wsl?.active?.name ?? null;
+      if (distro && active === distro && this.settings.wslDistro !== distro) {
+        await this.updateSettings({ wslDistro: distro }).catch(() => {});
+      }
     } catch (error) {
       this.wslError = message(error);
     } finally {
       this.checkingWsl = false;
+    }
+  }
+
+  async refreshTweaks(): Promise<void> {
+    if (this.checkingTweaks) return;
+    this.checkingTweaks = true;
+    try {
+      this.tweaks = await getTweaks();
+      this.tweakError = null;
+      for (const [id, choice] of this.tweakChoices) {
+        const tweak = this.tweaks.find((t) => t.id === id);
+        if (!tweak || (choice === "revert" && !tweak.revertible)) this.tweakChoices.delete(id);
+      }
+    } catch (error) {
+      this.tweakError = message(error);
+    } finally {
+      this.checkingTweaks = false;
+    }
+  }
+
+  async refreshDebloat(): Promise<void> {
+    if (!this.isWindows || this.checkingDebloat) return;
+    this.checkingDebloat = true;
+    try {
+      this.debloatItems = await getDebloat();
+      this.debloatError = null;
+      for (const id of this.debloatSelected) {
+        if (!this.debloatItems.some((item) => item.id === id && item.installed)) this.debloatSelected.delete(id);
+      }
+    } catch (error) {
+      this.debloatError = message(error);
+    } finally {
+      this.checkingDebloat = false;
     }
   }
 
@@ -193,6 +320,17 @@ class AppStore {
     else this.wslToggles.add(kind);
   }
 
+  /** Picks apply or revert for a tweak; choosing the current choice again clears it. */
+  chooseTweak(id: string, choice: TweakChoice): void {
+    if (this.tweakChoices.get(id) === choice) this.tweakChoices.delete(id);
+    else this.tweakChoices.set(id, choice);
+  }
+
+  toggleDebloat(id: string): void {
+    if (this.debloatSelected.has(id)) this.debloatSelected.delete(id);
+    else this.debloatSelected.add(id);
+  }
+
   /** Moves the dev tools into WSL and selects the ones not installed there yet. */
   selectDevOnWsl(): void {
     for (const app of this.catalog.filter((a) => DEV_ON_WSL.includes(a.id))) {
@@ -205,6 +343,8 @@ class AppStore {
     this.selected.clear();
     this.wslToggles.clear();
     this.distroToInstall = null;
+    this.tweakChoices.clear();
+    this.debloatSelected.clear();
   }
 
   resetRun(): void {
@@ -218,12 +358,37 @@ class AppStore {
     return {
       apps: this.selectedApps.map((app) => ({ id: app.id, target: this.targetOf(app) })),
       wsl: this.pendingWslActions,
+      tweaks: [...this.tweakChoices].map(([id, choice]) => ({ id, revert: choice === "revert" })),
+      debloat: [...this.debloatSelected],
     };
   }
 
+  /** Puts back a selection exactly as it was (after "Restart as administrator"). */
+  private restoreSelection(selection: RunRequest): void {
+    this.clearSelection();
+    for (const wanted of selection.apps) {
+      const app = this.catalog.find((a) => a.id === wanted.id);
+      if (!app) continue;
+      this.targets.set(app.id, wanted.target);
+      if (this.isAvailable(app)) this.selected.add(app.id);
+    }
+    for (const action of selection.wsl) {
+      if (action.kind === "installDistro") this.distroToInstall = action.distro;
+      else this.wslToggles.add(action.kind);
+    }
+    for (const wanted of selection.tweaks) {
+      if (this.tweaks.some((t) => t.id === wanted.id)) {
+        this.tweakChoices.set(wanted.id, wanted.revert ? "revert" : "apply");
+      }
+    }
+    for (const id of selection.debloat) {
+      if (this.debloatItems.some((item) => item.id === id && item.installed)) this.debloatSelected.add(id);
+    }
+  }
+
   /**
-   * Adds a profile or imported selection to the current one. Apps already installed stay unselected;
-   * apps that can't be installed here are reported, not selected.
+   * Adds a profile or imported selection to the current one. Apps already installed and tweaks already
+   * applied stay unselected; apps that can't be installed here are reported, not selected.
    */
   applySelection(selection: RunRequest): ApplyResult {
     const result: ApplyResult = { selected: 0, alreadyInstalled: [], skipped: [], needsWslSetup: false };
@@ -249,6 +414,25 @@ class AppStore {
       this.targets.set(app.id, target);
       if (!this.selected.has(app.id)) result.selected++;
       this.selected.add(app.id);
+    }
+
+    // Tweaks for another OS aren't in `this.tweaks` and are left out quietly.
+    for (const wanted of selection.tweaks) {
+      const tweak = this.tweaks.find((t) => t.id === wanted.id);
+      if (!tweak || wanted.revert) continue;
+      if (tweak.applied) {
+        result.alreadyInstalled.push(tweak.name);
+        continue;
+      }
+      if (this.tweakChoices.get(tweak.id) !== "apply") result.selected++;
+      this.tweakChoices.set(tweak.id, "apply");
+    }
+    // Items that aren't installed have nothing to remove.
+    for (const id of selection.debloat) {
+      const item = this.debloatItems.find((d) => d.id === id);
+      if (!item?.installed || this.debloatSelected.has(id)) continue;
+      this.debloatSelected.add(id);
+      result.selected++;
     }
 
     if (!this.isWindows) return result;
@@ -302,7 +486,10 @@ class AppStore {
     result.selected++;
   }
 
-  /** Selects everything installed on this PC (and in WSL), to save it as a profile or export it. */
+  /**
+   * Selects everything installed on this PC (and in WSL) and every tweak already applied,
+   * to save it as a profile or export it.
+   */
   selectInstalled(): number {
     const before = this.selectionCount;
     for (const app of this.catalog) {
@@ -318,6 +505,9 @@ class AppStore {
     if (active?.systemd) this.wslToggles.add("enableSystemd");
     if (active?.docker) this.wslToggles.add("dockerEngine");
     if (this.wsl?.vscodeExtension === true) this.wslToggles.add("vscodeExtension");
+    for (const tweak of this.tweaks) {
+      if (tweak.applied) this.tweakChoices.set(tweak.id, "apply");
+    }
     return this.selectionCount - before;
   }
 
@@ -338,6 +528,11 @@ class AppStore {
     this.profiles = await deleteProfile(id);
   }
 
+  /** Relaunches elevated with the current selection. Resolves to false if UAC was declined. */
+  restartAsAdmin(): Promise<boolean> {
+    return restartAsAdmin(this.currentSelection());
+  }
+
   async run(): Promise<void> {
     if (this.running || this.selectionCount === 0) return;
     const dryRun = this.dryRun;
@@ -354,7 +549,9 @@ class AppStore {
     if (!dryRun) {
       this.wslToggles.clear();
       this.distroToInstall = null;
-      await Promise.all([this.refreshInstalled(), this.refreshWsl()]);
+      this.tweakChoices.clear();
+      this.debloatSelected.clear();
+      await Promise.all([this.refreshInstalled(), this.refreshWsl(), this.refreshTweaks(), this.refreshDebloat()]);
     }
   }
 

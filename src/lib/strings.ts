@@ -1,5 +1,5 @@
 // All user-facing text lives here (English for now, ready for i18n later).
-import type { CatalogApp, Category, Target, TaskStatus, WslAction } from "./types";
+import type { CatalogApp, Category, Target, TaskStatus, Theme, TweakCategory, WslAction } from "./types";
 
 export const categoryOrder: Category[] = [
   "browsers",
@@ -23,11 +23,22 @@ export const categoryLabels: Record<Category, string> = {
   security: "Security",
 };
 
+export const tweakCategoryOrder: TweakCategory[] = ["appearance", "explorer", "taskbar", "privacy", "performance"];
+
+export const tweakCategoryLabels: Record<TweakCategory, string> = {
+  appearance: "Appearance",
+  explorer: "File Explorer",
+  taskbar: "Taskbar and Start",
+  privacy: "Privacy",
+  performance: "Performance and gaming",
+};
+
 export const taskStatusLabels: Record<TaskStatus | "pending" | "running", string> = {
   pending: "Waiting",
   running: "Running",
   succeeded: "Installed",
   done: "Done",
+  removed: "Removed",
   alreadyInstalled: "Already installed",
   failed: "Failed",
   simulated: "Simulated",
@@ -175,8 +186,13 @@ export const text = {
     delete: "Delete",
     confirmDelete: "Confirm delete",
     cancel: "Cancel",
-    counts: (apps: number, wsl: number) =>
-      [apps === 1 ? "1 app" : `${apps} apps`, wsl > 0 ? (wsl === 1 ? "1 WSL option" : `${wsl} WSL options`) : null]
+    counts: (apps: number, wsl: number, tweaks: number, debloat: number) =>
+      [
+        apps > 0 ? (apps === 1 ? "1 app" : `${apps} apps`) : null,
+        wsl > 0 ? (wsl === 1 ? "1 WSL option" : `${wsl} WSL options`) : null,
+        tweaks > 0 ? (tweaks === 1 ? "1 tweak" : `${tweaks} tweaks`) : null,
+        debloat > 0 ? `${debloat} to remove` : null,
+      ]
         .filter(Boolean)
         .join(" · "),
     more: (count: number) => `+${count} more`,
@@ -190,10 +206,59 @@ export const text = {
     applied: {
       selected: (count: number) =>
         count === 0 ? "Nothing new to select." : count === 1 ? "Selected 1 item." : `Selected ${count} items.`,
-      already: (names: string[]) => `Already installed: ${names.join(", ")}.`,
+      already: (names: string[]) => `Already installed or applied: ${names.join(", ")}.`,
       skipped: (names: string[]) => `Not available on this system: ${names.join(", ")}.`,
       needsWsl: "The WSL parts need WSL and a distro with a Linux user. Set them up in the WSL screen, then select this profile again.",
     },
+  },
+  tweaks: {
+    title: "Tweaks",
+    intro: "Small settings with an undo. In8 saves the old values before changing anything, so Revert puts them back.",
+    checking: "Reading current settings…",
+    checkAgain: "Check again",
+    none: "No tweaks for this system yet. On Linux, tweaks need GNOME.",
+    applied: "On",
+    admin: "Admin",
+    signOut: "After sign-out",
+    signOutHint: "Shows up fully after you sign out or restart.",
+    apply: "Apply",
+    revert: "Revert",
+    willApply: "Will apply",
+    willRevert: "Will revert",
+    selectCategory: "Select all",
+  },
+  debloat: {
+    title: "Debloat",
+    intro:
+      "Remove apps that come with Windows, for your user only. They can come back from the Microsoft Store if you want them later, but In8 can't undo a removal.",
+    checking: "Checking installed apps…",
+    checkAgain: "Check again",
+    safe: "Safe to remove",
+    advanced: "Advanced",
+    advancedHint: "Something you use may depend on these. In8 asks again before removing them.",
+    notInstalled: (count: number) =>
+      count === 1 ? "1 item isn't installed here." : `${count} items aren't installed here.`,
+    nothing: "Nothing from the list is installed. Already clean.",
+    selectSafe: "Select all safe",
+  },
+  settings: {
+    title: "Settings",
+    alwaysAdmin: "Always run as administrator",
+    alwaysAdminHint:
+      "In8 asks for administrator rights (one UAC prompt) every time it opens. Needed for some tweaks; installs work without it.",
+    alwaysAdminDev: "Takes effect from the next start. Ignored while developing (tauri dev).",
+    elevated: "Running as administrator.",
+    notElevated: "Not running as administrator.",
+    declined: "The administrator prompt was declined, so In8 opened without administrator rights.",
+    restartNow: "Restart as administrator",
+    dryRun: "Start with Dry run checked",
+    dryRunHint: "The review screen starts in simulation mode, showing commands without running them.",
+    theme: "Theme",
+    themes: { system: "System", light: "Light", dark: "Dark" } satisfies Record<Theme, string>,
+    wslDistro: "WSL distro",
+    wslDistroHint: "In8 remembers the distro you pick in the WSL screen.",
+    wslDistroDefault: "Windows default",
+    saved: "Saved.",
   },
   bar: {
     selected: (count: number) => (count === 1 ? "1 item selected" : `${count} items selected`),
@@ -215,5 +280,13 @@ export const text = {
     showLog: "Show output",
     hideLog: "Hide output",
     noOutput: "No output.",
+    needsAdmin: "Some tweaks need administrator rights. Restart In8 as administrator to apply them; your selection comes along.",
+    restartAsAdmin: "Restart as administrator",
+    adminDeclined: "The administrator prompt was declined.",
+    confirmAdvanced: (names: string[]) =>
+      `I understand that removing ${names.join(", ")} can break something I use.`,
+    signOut: "Some changes show up fully after you sign out of Windows or restart.",
+    groups: { debloat: "Remove", apps: "Install", tweaks: "Tweaks" },
+    revertLabel: (name: string) => `Revert: ${name}`,
   },
 } as const;
