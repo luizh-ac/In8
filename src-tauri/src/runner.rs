@@ -25,6 +25,8 @@ pub struct Task {
     pub label: String,
     pub action: InstallAction,
     pub kind: TaskKind,
+    /// A task that must have finished first; if it failed (or was skipped), this one is skipped.
+    pub needs: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -44,6 +46,8 @@ pub enum TaskStatus {
     Done,
     /// A debloat item that was uninstalled.
     Removed,
+    /// Not run because a task it needs didn't finish.
+    Skipped,
     AlreadyInstalled,
     Failed,
     Simulated,
@@ -131,6 +135,7 @@ fn setup_task(id: impl Into<String>, label: impl Into<String>, cmd: Cmd) -> Task
         label: label.into(),
         action: InstallAction::Command(cmd),
         kind: TaskKind::Setup,
+        needs: None,
     }
 }
 
@@ -180,6 +185,7 @@ pub fn plan(
             label: app.name.clone(),
             action,
             kind: TaskKind::Install(manager),
+            needs: None,
         });
     }
 
@@ -211,6 +217,7 @@ fn plan_flatpak_setup(platform: &PlatformInfo, wanted: bool) -> Result<Vec<Task>
                 label: "Update package lists".into(),
                 action: InstallAction::Root(apt::native_update_cmd()),
                 kind: TaskKind::Setup,
+                needs: None,
             });
             apt::native_install_cmd(&["flatpak"])
         }
@@ -222,12 +229,16 @@ fn plan_flatpak_setup(platform: &PlatformInfo, wanted: bool) -> Result<Vec<Task>
         label: "Install Flatpak".into(),
         action: InstallAction::Root(install),
         kind: TaskKind::Install(manager),
+        needs: None,
     });
-    tasks.push(setup_task(
+    let mut flathub = setup_task(
         format!("setup-flatpak-{}", pm::flatpak::FLATHUB_NAME),
         "Add the Flathub repository",
         pm::flatpak::add_remote_cmd(pm::flatpak::FLATHUB_NAME, pm::flatpak::FLATHUB_REPO),
-    ));
+    );
+    // The remote is added with the flatpak command the previous task installs.
+    flathub.needs = Some("setup-flatpak".into());
+    tasks.push(flathub);
     Ok(tasks)
 }
 
@@ -262,6 +273,7 @@ pub fn plan_system(
             label: format!("Remove {}", item.name),
             action: InstallAction::Command(debloat::remove_cmd(item)),
             kind: TaskKind::Remove,
+            needs: None,
         });
     }
 
@@ -291,6 +303,7 @@ pub fn plan_system(
                 state: Arc::clone(context.state),
             })),
             kind: TaskKind::Setup,
+            needs: None,
         });
     }
     Ok((removals, tweak_tasks))
@@ -382,6 +395,7 @@ fn plan_wsl(
                     apt::install_cmd(&[&package]),
                 )),
                 kind: TaskKind::Install(PmId::Apt),
+                needs: None,
             });
         }
         if docker {
@@ -394,6 +408,7 @@ fn plan_wsl(
                     apt::install_cmd(&["docker.io", "docker-compose-v2"]),
                 )),
                 kind: TaskKind::Install(PmId::Apt),
+                needs: None,
             });
             tasks.push(setup_task(
                 "docker-group",
@@ -422,6 +437,7 @@ fn plan_wsl(
             label: "VS Code WSL extension".into(),
             action: InstallAction::VscodeExtension(wsl::VSCODE_WSL_EXTENSION.into()),
             kind: TaskKind::Setup,
+            needs: None,
         });
     }
     Ok(tasks)
@@ -438,18 +454,39 @@ enum RootState {
 pub fn run(tasks: &[Task], dry_run: bool, mut emit: impl FnMut(RunEvent)) -> RunSummary {
     let (mut succeeded, mut failed) = (0, 0);
     let mut root = RootState::NotStarted;
+    // Tasks that didn't finish, so the ones that need them are skipped.
+    let mut not_done: HashSet<&str> = HashSet::new();
     for task in tasks {
         emit(RunEvent::TaskStarted {
             task_id: task.id.clone(),
             label: task.label.clone(),
             command: task.action.display(),
         });
-        let (status, exit_code) = if dry_run {
+        let blocked_by = task
+            .needs
+            .as_deref()
+            .filter(|needed| not_done.contains(needed))
+            .map(|needed| {
+                tasks
+                    .iter()
+                    .find(|t| t.id == needed)
+                    .map_or(needed, |t| t.label.as_str())
+            });
+        let (status, exit_code) = if let Some(label) = blocked_by {
+            emit(RunEvent::Output {
+                task_id: task.id.clone(),
+                line: format!("Skipped: \"{label}\" didn't finish."),
+            });
+            (TaskStatus::Skipped, None)
+        } else if dry_run {
             (TaskStatus::Simulated, None)
         } else {
             execute(task, &mut root, &mut emit)
         };
-        if status == TaskStatus::Failed {
+        if matches!(status, TaskStatus::Failed | TaskStatus::Skipped) {
+            not_done.insert(task.id.as_str());
+        }
+        if matches!(status, TaskStatus::Failed | TaskStatus::Skipped) {
             failed += 1;
         } else {
             succeeded += 1;
@@ -873,6 +910,26 @@ mod tests {
     }
 
     #[test]
+    fn tasks_whose_prerequisite_failed_are_skipped() {
+        let task = |id: &str, needs: Option<&str>| Task {
+            id: id.into(),
+            label: id.into(),
+            action: InstallAction::Command(Cmd::new("in8-no-such-program")),
+            kind: TaskKind::Setup,
+            needs: needs.map(str::to_string),
+        };
+        let tasks = [task("first", None), task("second", Some("first"))];
+        let mut statuses = Vec::new();
+        let summary = run(&tasks, false, |event| {
+            if let RunEvent::TaskFinished { status, .. } = event {
+                statuses.push(status);
+            }
+        });
+        assert_eq!(statuses, [TaskStatus::Failed, TaskStatus::Skipped]);
+        assert_eq!(summary.failed, 2);
+    }
+
+    #[test]
     fn native_linux_installs_run_as_root_after_one_package_list_update() {
         let catalog = Catalog::load_embedded().unwrap();
         let ubuntu = platform(Os::Linux, &[PmId::Apt]);
@@ -984,6 +1041,7 @@ mod tests {
             label: "X".into(),
             action: InstallAction::Command(Cmd::new("program-that-does-not-exist").arg("--flag")),
             kind: TaskKind::Setup,
+            needs: None,
         }];
         let mut events = Vec::new();
         let summary = run(&tasks, true, |event| events.push(event));
@@ -1015,12 +1073,14 @@ mod tests {
                 label: "cargo".into(),
                 action: InstallAction::Command(Cmd::new("cargo").arg("--version")),
                 kind: TaskKind::Setup,
+                needs: None,
             },
             Task {
                 id: "missing".into(),
                 label: "missing".into(),
                 action: InstallAction::Command(Cmd::new("program-that-does-not-exist")),
                 kind: TaskKind::Setup,
+                needs: None,
             },
         ];
         let mut events = Vec::new();

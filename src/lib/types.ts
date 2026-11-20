@@ -142,7 +142,7 @@ export interface RunRequest {
 }
 
 // runner.rs ("done": a setup step or tweak finished; "removed": a debloat item was uninstalled)
-export type TaskStatus = "succeeded" | "done" | "removed" | "alreadyInstalled" | "failed" | "simulated";
+export type TaskStatus = "succeeded" | "done" | "removed" | "alreadyInstalled" | "failed" | "skipped" | "simulated";
 
 export type RunEvent =
   | { event: "taskStarted"; taskId: string; label: string; command: string }

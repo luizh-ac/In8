@@ -41,6 +41,7 @@ export const taskStatusLabels: Record<TaskStatus | "pending" | "running", string
   removed: "Removed",
   alreadyInstalled: "Already installed",
   failed: "Failed",
+  skipped: "Skipped",
   simulated: "Simulated",
 };
 

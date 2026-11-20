@@ -184,7 +184,16 @@ impl RootSession {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| format!("Couldn't start pkexec: {e}"))?;
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    "pkexec isn't installed, so In8 can't ask for the administrator password. Install it \
+                     with your distro's package manager (Debian/Ubuntu: pkexec; Fedora and Arch: polkit), \
+                     then try again."
+                        .to_string()
+                } else {
+                    format!("Couldn't start pkexec: {e}")
+                }
+            })?;
         let (Some(stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
             return Err("couldn't talk to the administrator helper".into());
         };
@@ -202,6 +211,11 @@ impl RootSession {
                 }
                 let _ = session.child.wait();
                 let error = error.trim();
+                if error.contains("authentication agent") {
+                    return Err("There's no password dialog (polkit agent) in this session, so In8 can't ask \
+                         for the administrator password. This happens in WSL and on minimal desktops."
+                        .into());
+                }
                 Err(if error.is_empty() {
                     "The administrator password wasn't given.".to_string()
                 } else {

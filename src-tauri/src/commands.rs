@@ -595,6 +595,7 @@ mod tests {
             label: "echo".into(),
             action: pm::InstallAction::Command(wsl::inside(&distro.name, false, echoed)),
             kind: runner::TaskKind::Setup,
+            needs: None,
         };
         runner::run(&[task], false, |event| events.push(event));
         assert!(events.iter().any(|event| matches!(

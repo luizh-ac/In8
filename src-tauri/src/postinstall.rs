@@ -329,6 +329,7 @@ pub fn plan(
         label,
         action,
         kind: TaskKind::Setup,
+        needs: None,
     };
 
     for request in requests {
@@ -461,6 +462,7 @@ pub fn plan(
                                 wsl::VSCODE_WSL_EXTENSION.into(),
                             ),
                             kind: TaskKind::Setup,
+                            needs: None,
                         });
                     }
                     for option in picked {
