@@ -2,16 +2,18 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
 use serde::Serialize;
-use tauri::State;
 use tauri::ipc::Channel;
+use tauri::{AppHandle, State};
+use tauri_plugin_dialog::DialogExt;
 
 use crate::catalog::{App, Catalog};
 use crate::error::{Error, Result};
 use crate::platform::{Os, PlatformInfo};
 use crate::pm::{self, PmId, apt};
+use crate::profiles::{ImportResult, Profile, ProfileEntry, UserProfiles};
 use crate::resolve::{Resolution, resolve, resolve_wsl};
 use crate::runner::{self, RunEvent, RunRequest, RunSummary};
 use crate::wsl::{self, DistroDetails, OnlineDistro, WslConfig, WslStatus};
@@ -22,6 +24,22 @@ pub struct AppState {
     pub running: Arc<AtomicBool>,
     /// The WSL distro In8 works with, from the last `get_wsl_status`.
     pub wsl: RwLock<Option<DistroDetails>>,
+    pub profiles: Arc<ProfileState>,
+}
+
+pub struct ProfileState {
+    pub catalog: Arc<Catalog>,
+    pub builtin: Vec<Profile>,
+    /// Locked for each read-modify-write of the user's profiles file.
+    pub user: Mutex<UserProfiles>,
+}
+
+impl ProfileState {
+    fn user(&self) -> MutexGuard<'_, UserProfiles> {
+        self.user
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
 }
 
 impl AppState {
@@ -178,6 +196,105 @@ pub async fn start_run(
     .await;
     running.store(false, Ordering::SeqCst);
     result?
+}
+
+fn profile_entries(state: &ProfileState) -> Result<Vec<ProfileEntry>> {
+    let user = state.user().load(&state.catalog)?;
+    Ok(state
+        .builtin
+        .iter()
+        .map(|profile| ProfileEntry {
+            profile: profile.clone(),
+            builtin: true,
+        })
+        .chain(user.into_iter().map(|profile| ProfileEntry {
+            profile,
+            builtin: false,
+        }))
+        .collect())
+}
+
+/// Built-in profiles first, then the user's.
+#[tauri::command]
+pub async fn get_profiles(state: State<'_, AppState>) -> Result<Vec<ProfileEntry>> {
+    let profiles = Arc::clone(&state.profiles);
+    blocking(move || profile_entries(&profiles)).await?
+}
+
+/// Saves the selection as a user profile (same name replaces it) and returns all profiles.
+#[tauri::command]
+pub async fn save_profile(
+    state: State<'_, AppState>,
+    name: String,
+    selection: RunRequest,
+) -> Result<Vec<ProfileEntry>> {
+    let profiles = Arc::clone(&state.profiles);
+    blocking(move || {
+        profiles.user().save(&profiles.catalog, &name, &selection)?;
+        profile_entries(&profiles)
+    })
+    .await?
+}
+
+#[tauri::command]
+pub async fn delete_profile(state: State<'_, AppState>, id: String) -> Result<Vec<ProfileEntry>> {
+    let profiles = Arc::clone(&state.profiles);
+    blocking(move || {
+        profiles.user().delete(&profiles.catalog, &id)?;
+        profile_entries(&profiles)
+    })
+    .await?
+}
+
+/// Asks where to save, then writes the selection and the user's profiles. `None` if cancelled.
+#[tauri::command]
+pub async fn export_backup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    selection: RunRequest,
+) -> Result<Option<String>> {
+    let profiles = Arc::clone(&state.profiles);
+    blocking(move || {
+        let Some(path) = app
+            .dialog()
+            .file()
+            .set_title("Export In8 backup")
+            .add_filter("In8 backup", &["json"])
+            .set_file_name("in8-backup.json")
+            .blocking_save_file()
+        else {
+            return Ok(None);
+        };
+        let path = path.into_path().map_err(|e| Error::Dialog(e.to_string()))?;
+        profiles
+            .user()
+            .export(&profiles.catalog, &selection, &path)?;
+        Ok(Some(path.display().to_string()))
+    })
+    .await?
+}
+
+/// Asks for a backup file, saves its profiles and returns its selection. `None` if cancelled.
+#[tauri::command]
+pub async fn import_backup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Option<ImportResult>> {
+    let profiles = Arc::clone(&state.profiles);
+    blocking(move || {
+        let Some(path) = app
+            .dialog()
+            .file()
+            .set_title("Import In8 backup")
+            .add_filter("In8 backup", &["json"])
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        let path = path.into_path().map_err(|e| Error::Dialog(e.to_string()))?;
+        profiles.user().import(&profiles.catalog, &path).map(Some)
+    })
+    .await?
 }
 
 fn installed_app_ids(catalog: &Catalog, platform: &PlatformInfo) -> Result<Vec<String>> {

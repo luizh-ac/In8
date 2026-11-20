@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "my-setup",
+      "name": "My setup",
+      "description": "Everything in the catalog, with the dev tools inside WSL.",
+      "apps": [
+        { "id": "chrome" },
+        { "id": "brave" },
+        { "id": "vscode" },
+        { "id": "git", "target": "wsl" },
+        { "id": "nodejs", "target": "wsl" },
+        { "id": "python", "target": "wsl" },
+        { "id": "rust", "target": "wsl" },
+        { "id": "discord" },
+        { "id": "whatsapp" },
+        { "id": "whatsapp-beta" },
+        { "id": "teams" },
+        { "id": "spotify" },
+        { "id": "youtube-music" },
+        { "id": "stremio" },
+        { "id": "netflix" },
+        { "id": "prime-video" },
+        { "id": "7zip" },
+        { "id": "qbittorrent" },
+        { "id": "steam" },
+        { "id": "epic-games" },
+        { "id": "ea-app" },
+        { "id": "ubisoft-connect" },
+        { "id": "battlenet" },
+        { "id": "curseforge" },
+        { "id": "hydra" },
+        { "id": "google-play-games" },
+        { "id": "notion" },
+        { "id": "obsidian" },
+        { "id": "artcraft-launcher" },
+        { "id": "claude" },
+        { "id": "protonvpn" }
+      ],
+      "wsl": [
+        { "kind": "enableSystemd" },
+        { "kind": "dockerEngine" },
+        { "kind": "vscodeExtension" }
+      ]
+    },
+    {
+      "id": "essentials",
+      "name": "Essentials",
+      "description": "Browsers, archives, downloads and a VPN.",
+      "apps": [
+        { "id": "chrome" },
+        { "id": "brave" },
+        { "id": "7zip" },
+        { "id": "qbittorrent" },
+        { "id": "protonvpn" }
+      ]
+    },
+    {
+      "id": "dev-on-wsl",
+      "name": "Dev on WSL",
+      "description": "VS Code on Windows; Git, Node.js, Python, Rust and Docker Engine inside WSL.",
+      "apps": [
+        { "id": "vscode" },
+        { "id": "git", "target": "wsl" },
+        { "id": "nodejs", "target": "wsl" },
+        { "id": "python", "target": "wsl" },
+        { "id": "rust", "target": "wsl" }
+      ],
+      "wsl": [
+        { "kind": "enableSystemd" },
+        { "kind": "dockerEngine" },
+        { "kind": "vscodeExtension" }
+      ]
+    },
+    {
+      "id": "gaming",
+      "name": "Gaming",
+      "description": "Game stores, launchers and mod managers.",
+      "apps": [
+        { "id": "steam" },
+        { "id": "epic-games" },
+        { "id": "ea-app" },
+        { "id": "ubisoft-connect" },
+        { "id": "battlenet" },
+        { "id": "curseforge" },
+        { "id": "hydra" },
+        { "id": "google-play-games" }
+      ]
+    },
+    {
+      "id": "media-chat",
+      "name": "Media & chat",
+      "description": "Music, streaming and messaging.",
+      "apps": [
+        { "id": "spotify" },
+        { "id": "youtube-music" },
+        { "id": "stremio" },
+        { "id": "netflix" },
+        { "id": "prime-video" },
+        { "id": "discord" },
+        { "id": "whatsapp" },
+        { "id": "teams" }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import Sidebar from "./lib/components/Sidebar.svelte";
   import AppsView from "./lib/views/AppsView.svelte";
+  import ProfilesView from "./lib/views/ProfilesView.svelte";
   import RunView from "./lib/views/RunView.svelte";
   import WslView from "./lib/views/WslView.svelte";
   import { store } from "./lib/store.svelte";
@@ -15,7 +16,8 @@
     store.view === "apps" || store.view === "run" ? "" : text.nav[store.view],
   );
   const showBar = $derived(
-    (store.view === "apps" || store.view === "wsl") && store.selectionCount > 0,
+    (store.view === "apps" || store.view === "profiles" || store.view === "wsl") &&
+      store.selectionCount > 0,
   );
 
   function review(): void {
@@ -35,6 +37,8 @@
         </p>
       {:else if store.view === "apps"}
         <AppsView />
+      {:else if store.view === "profiles"}
+        <ProfilesView />
       {:else if store.view === "wsl"}
         <WslView />
       {:else if store.view === "run"}

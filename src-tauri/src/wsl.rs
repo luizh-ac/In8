@@ -68,7 +68,7 @@ pub struct OnlineDistro {
 }
 
 /// Environment actions requested from the WSL screen.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",

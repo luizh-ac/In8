@@ -114,13 +114,19 @@ export type WslAction =
   | { kind: "vscodeExtension" };
 
 // runner.rs
+export interface AppRequest {
+  id: string;
+  target: Target;
+}
+
+/** What to run; also the selection stored in profiles and backups. */
 export interface RunRequest {
-  apps: { id: string; target: Target }[];
+  apps: AppRequest[];
   wsl: WslAction[];
 }
 
-// runner.rs
-export type TaskStatus = "succeeded" | "alreadyInstalled" | "failed" | "simulated";
+// runner.rs ("done" is a setup step that finished, not an app install)
+export type TaskStatus = "succeeded" | "done" | "alreadyInstalled" | "failed" | "simulated";
 
 export type RunEvent =
   | { event: "taskStarted"; taskId: string; label: string; command: string }
@@ -131,4 +137,26 @@ export type RunEvent =
 export interface RunSummary {
   succeeded: number;
   failed: number;
+}
+
+// profiles.rs
+export interface Profile {
+  id: string;
+  name: string;
+  description: string;
+  apps: AppRequest[];
+  wsl: WslAction[];
+}
+
+export interface ProfileEntry extends Profile {
+  /** Ships with In8 (can't be deleted); otherwise saved by the user. */
+  builtin: boolean;
+}
+
+export interface ImportResult {
+  selection: RunRequest;
+  /** How many saved profiles the file brought in. */
+  profiles: number;
+  /** App IDs from the file that this version of In8 doesn't know. */
+  unknownApps: string[];
 }

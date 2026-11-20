@@ -1,9 +1,21 @@
 // App-wide state (Svelte 5 runes).
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import { getCatalog, getInstalled, getPlatform, getWslInstalled, getWslStatus, startRun } from "./api";
+import {
+  deleteProfile,
+  getCatalog,
+  getInstalled,
+  getPlatform,
+  getProfiles,
+  getWslInstalled,
+  getWslStatus,
+  saveProfile,
+  startRun,
+} from "./api";
+import { wslActionLabel } from "./strings";
 import type {
   CatalogApp,
   PlatformInfo,
+  ProfileEntry,
   Resolution,
   RunEvent,
   RunRequest,
@@ -36,6 +48,18 @@ export interface TaskState {
   lines: string[];
 }
 
+/** What applying a profile or an imported selection did. */
+export interface ApplyResult {
+  /** Items newly added to the selection. */
+  selected: number;
+  /** Names of apps and WSL options left out because they're already there. */
+  alreadyInstalled: string[];
+  /** Names of apps that can't be installed on this system. */
+  skipped: string[];
+  /** Some WSL parts wait for WSL and a distro to be set up first. */
+  needsWslSetup: boolean;
+}
+
 const MAX_LINES_PER_TASK = 500;
 /** Apps the "Dev tools on WSL" shortcut moves into WSL. */
 export const DEV_ON_WSL = ["git", "nodejs", "python", "rust"];
@@ -65,6 +89,9 @@ class AppStore {
   wslError = $state<string | null>(null);
   wslToggles = new SvelteSet<WslToggle>();
   distroToInstall = $state<string | null>(null);
+
+  profiles = $state<ProfileEntry[]>([]);
+  profileError = $state<string | null>(null);
 
   dryRun = $state(true);
   running = $state(false);
@@ -112,7 +139,7 @@ class AppStore {
       this.loadError = message(error);
       return;
     }
-    await Promise.all([this.refreshInstalled(), this.refreshWsl()]);
+    await Promise.all([this.refreshInstalled(), this.refreshWsl(), this.loadProfiles()]);
   }
 
   async refreshInstalled(): Promise<void> {
@@ -186,13 +213,135 @@ class AppStore {
     this.runError = null;
   }
 
-  async run(): Promise<void> {
-    if (this.running || this.selectionCount === 0) return;
-    const dryRun = this.dryRun;
-    const request: RunRequest = {
+  /** The current selection, in the shape runs, profiles and backups use. */
+  currentSelection(): RunRequest {
+    return {
       apps: this.selectedApps.map((app) => ({ id: app.id, target: this.targetOf(app) })),
       wsl: this.pendingWslActions,
     };
+  }
+
+  /**
+   * Adds a profile or imported selection to the current one. Apps already installed stay unselected;
+   * apps that can't be installed here are reported, not selected.
+   */
+  applySelection(selection: RunRequest): ApplyResult {
+    const result: ApplyResult = { selected: 0, alreadyInstalled: [], skipped: [], needsWslSetup: false };
+    const ready = this.wsl?.active ?? null;
+    const distroReady = !!ready && ready.hasUser && ready.apt;
+
+    for (const wanted of selection.apps) {
+      const app = this.catalog.find((a) => a.id === wanted.id);
+      if (!app) continue;
+      // WSL only exists on Windows; elsewhere the app installs natively.
+      const target: Target = this.isWindows && wanted.target === "wsl" ? "wsl" : "host";
+      const resolution = target === "wsl" ? app.wslResolution : app.resolution;
+      if (resolution?.status !== "available") {
+        if (target === "wsl" && !distroReady) result.needsWslSetup = true;
+        else result.skipped.push(app.name);
+        continue;
+      }
+      const installed = target === "wsl" ? this.installedWsl.has(app.id) : this.installed.has(app.id);
+      if (installed) {
+        result.alreadyInstalled.push(app.name);
+        continue;
+      }
+      this.targets.set(app.id, target);
+      if (!this.selected.has(app.id)) result.selected++;
+      this.selected.add(app.id);
+    }
+
+    if (!this.isWindows) return result;
+    const status = this.wsl;
+    const wantsWsl = selection.wsl.length > 0 || selection.apps.some((a) => a.target === "wsl");
+    if (wantsWsl && status && !status.installed) {
+      this.addWslToggle("installWsl", result);
+      result.needsWslSetup = true;
+      return result;
+    }
+    for (const action of selection.wsl) {
+      switch (action.kind) {
+        case "installWsl":
+          if (status?.installed) result.alreadyInstalled.push(wslActionLabel(action));
+          else this.addWslToggle("installWsl", result);
+          break;
+        case "installDistro":
+          if (status?.distros.some((d) => d.name === action.distro)) {
+            result.alreadyInstalled.push(wslActionLabel(action));
+          } else if (this.distroToInstall !== action.distro) {
+            this.distroToInstall = action.distro;
+            result.selected++;
+          }
+          break;
+        case "enableSystemd":
+        case "dockerEngine": {
+          const done = action.kind === "enableSystemd" ? ready?.systemd : ready?.docker;
+          if (done) {
+            result.alreadyInstalled.push(wslActionLabel(action));
+          } else if (!distroReady) {
+            result.needsWslSetup = true;
+          } else {
+            this.addWslToggle(action.kind, result);
+            // Docker Engine needs systemd.
+            if (action.kind === "dockerEngine" && !ready?.systemd) this.addWslToggle("enableSystemd", result);
+          }
+          break;
+        }
+        case "vscodeExtension":
+          if (status?.vscodeExtension === true) result.alreadyInstalled.push(wslActionLabel(action));
+          else this.addWslToggle("vscodeExtension", result);
+          break;
+      }
+    }
+    return result;
+  }
+
+  private addWslToggle(kind: WslToggle, result: ApplyResult): void {
+    if (this.wslToggles.has(kind)) return;
+    this.wslToggles.add(kind);
+    result.selected++;
+  }
+
+  /** Selects everything installed on this PC (and in WSL), to save it as a profile or export it. */
+  selectInstalled(): number {
+    const before = this.selectionCount;
+    for (const app of this.catalog) {
+      if (this.installedWsl.has(app.id) && app.wslResolution?.status === "available") {
+        this.targets.set(app.id, "wsl");
+        this.selected.add(app.id);
+      } else if (this.installed.has(app.id) && app.resolution.status === "available") {
+        this.targets.set(app.id, "host");
+        this.selected.add(app.id);
+      }
+    }
+    const active = this.wsl?.active;
+    if (active?.systemd) this.wslToggles.add("enableSystemd");
+    if (active?.docker) this.wslToggles.add("dockerEngine");
+    if (this.wsl?.vscodeExtension === true) this.wslToggles.add("vscodeExtension");
+    return this.selectionCount - before;
+  }
+
+  async loadProfiles(): Promise<void> {
+    try {
+      this.profiles = await getProfiles();
+      this.profileError = null;
+    } catch (error) {
+      this.profileError = message(error);
+    }
+  }
+
+  async saveProfile(name: string): Promise<void> {
+    this.profiles = await saveProfile(name, this.currentSelection());
+  }
+
+  async deleteProfile(id: string): Promise<void> {
+    this.profiles = await deleteProfile(id);
+  }
+
+  async run(): Promise<void> {
+    if (this.running || this.selectionCount === 0) return;
+    const dryRun = this.dryRun;
+    const request = this.currentSelection();
     this.resetRun();
     this.running = true;
     try {

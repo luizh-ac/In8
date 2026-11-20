@@ -35,6 +35,8 @@ pub enum TaskKind {
 #[serde(rename_all = "camelCase")]
 pub enum TaskStatus {
     Succeeded,
+    /// A setup step (not an app install) that finished.
+    Done,
     AlreadyInstalled,
     Failed,
     Simulated,
@@ -75,7 +77,8 @@ pub struct RunSummary {
 }
 
 /// What the user asked to run. Mirrored in `src/lib/types.ts` (`RunRequest`).
-#[derive(Debug, Clone, Default, Deserialize)]
+/// Also the shape of a profile's selection and of the backup file's selection.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunRequest {
     #[serde(default)]
@@ -84,7 +87,7 @@ pub struct RunRequest {
     pub wsl: Vec<WslAction>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppRequest {
     pub id: String,
@@ -409,7 +412,7 @@ fn run_process(task_id: &str, cmd: &Cmd, emit: &mut impl FnMut(RunEvent)) -> Opt
 
 fn status_for(kind: TaskKind, code: Option<i32>) -> TaskStatus {
     let outcome = match kind {
-        TaskKind::Setup if code == Some(0) => InstallOutcome::Installed,
+        TaskKind::Setup if code == Some(0) => return TaskStatus::Done,
         TaskKind::Setup => InstallOutcome::Failed,
         TaskKind::Install(manager) => pm::interpret_exit(manager, code),
     };

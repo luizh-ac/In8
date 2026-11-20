@@ -27,6 +27,7 @@ export const taskStatusLabels: Record<TaskStatus | "pending" | "running", string
   pending: "Waiting",
   running: "Running",
   succeeded: "Installed",
+  done: "Done",
   alreadyInstalled: "Already installed",
   failed: "Failed",
   simulated: "Simulated",
@@ -147,6 +148,52 @@ export const text = {
     preview: "Preview",
     save: "Save",
     saved: "Saved. Restart WSL (wsl --shutdown) to apply.",
+  },
+  profiles: {
+    title: "Profiles",
+    intro: "Pick one or more. Each adds its apps to your selection; apps already installed stay unselected.",
+    import: "Import…",
+    export: "Export…",
+    exportHint:
+      "Export saves your current selection and your saved profiles to one file. Keep it somewhere that survives formatting, like a cloud drive or a USB stick.",
+    exported: (path: string) => `Saved to ${path}`,
+    imported: (profiles: number) =>
+      profiles === 0
+        ? "Backup imported."
+        : `Backup imported with ${profiles === 1 ? "1 saved profile" : `${profiles} saved profiles`}.`,
+    unknownApps: (ids: string[]) => `Not in this version of In8: ${ids.join(", ")}.`,
+    thisPc: "This PC",
+    thisPcHint: "Select every catalog app installed here, including inside WSL. Then save it as a profile or export it.",
+    selectInstalled: "Select installed apps",
+    checking: "Still checking what's installed…",
+    capturedNone: "Nothing new to select.",
+    captured: (count: number) => (count === 1 ? "Selected 1 item." : `Selected ${count} items.`),
+    builtin: "Ready-made",
+    mine: "My profiles",
+    noneSaved: "No saved profiles yet. Select apps, then save them below.",
+    select: "Select",
+    delete: "Delete",
+    confirmDelete: "Confirm delete",
+    cancel: "Cancel",
+    counts: (apps: number, wsl: number) =>
+      [apps === 1 ? "1 app" : `${apps} apps`, wsl > 0 ? (wsl === 1 ? "1 WSL option" : `${wsl} WSL options`) : null]
+        .filter(Boolean)
+        .join(" · "),
+    more: (count: number) => `+${count} more`,
+    save: "Save current selection",
+    saveHint: "Saving with the name of an existing profile replaces it.",
+    namePlaceholder: "Profile name",
+    saveButton: "Save",
+    replaceButton: "Replace",
+    saved: (name: string) => `Saved "${name}".`,
+    nothingSelected: "Select apps or WSL options first.",
+    applied: {
+      selected: (count: number) =>
+        count === 0 ? "Nothing new to select." : count === 1 ? "Selected 1 item." : `Selected ${count} items.`,
+      already: (names: string[]) => `Already installed: ${names.join(", ")}.`,
+      skipped: (names: string[]) => `Not available on this system: ${names.join(", ")}.`,
+      needsWsl: "The WSL parts need WSL and a distro with a Linux user. Set them up in the WSL screen, then select this profile again.",
+    },
   },
   bar: {
     selected: (count: number) => (count === 1 ? "1 item selected" : `${count} items selected`),

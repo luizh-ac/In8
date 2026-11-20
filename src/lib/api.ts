@@ -2,8 +2,10 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
   CatalogApp,
+  ImportResult,
   OnlineDistro,
   PlatformInfo,
+  ProfileEntry,
   RunEvent,
   RunRequest,
   RunSummary,
@@ -52,6 +54,30 @@ export function previewWslConfig(config: WslConfig): Promise<string> {
 
 export function saveWslConfig(config: WslConfig): Promise<void> {
   return invoke<void>("save_wslconfig", { config });
+}
+
+/** Built-in profiles first, then the user's saved ones. */
+export function getProfiles(): Promise<ProfileEntry[]> {
+  return invoke<ProfileEntry[]>("get_profiles");
+}
+
+/** Saves the selection as a profile (the same name replaces it); returns all profiles. */
+export function saveProfile(name: string, selection: RunRequest): Promise<ProfileEntry[]> {
+  return invoke<ProfileEntry[]>("save_profile", { name, selection });
+}
+
+export function deleteProfile(id: string): Promise<ProfileEntry[]> {
+  return invoke<ProfileEntry[]>("delete_profile", { id });
+}
+
+/** Opens a save dialog and writes the backup. Resolves to the file path, or null if cancelled. */
+export function exportBackup(selection: RunRequest): Promise<string | null> {
+  return invoke<string | null>("export_backup", { selection });
+}
+
+/** Opens a file picker and imports a backup. Resolves to null if cancelled. */
+export function importBackup(): Promise<ImportResult | null> {
+  return invoke<ImportResult | null>("import_backup");
 }
 
 export function startRun(

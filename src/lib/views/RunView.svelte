@@ -14,6 +14,7 @@
   function statusClass(status: TaskState["status"]): string {
     switch (status) {
       case "succeeded":
+      case "done":
       case "alreadyInstalled":
         return "text-emerald-600 dark:text-emerald-400";
       case "failed":

@@ -10,6 +10,12 @@ pub enum Error {
     Unavailable(String),
     #[error("WSL: {0}")]
     Wsl(String),
+    #[error("Profiles: {0}")]
+    Profile(String),
+    #[error("Backup: {0}")]
+    Backup(String),
+    #[error("File dialog: {0}")]
+    Dialog(String),
     #[error("Another run is already in progress")]
     AlreadyRunning,
     #[error("Background task failed: {0}")]
