@@ -14,6 +14,19 @@ pub fn is_available() -> bool {
     exec::capture(&Cmd::new("winget").arg("--version")).is_some()
 }
 
+/// Registers App Installer (which brings winget) for this user. On a fresh Windows it's often there but
+/// not registered yet. The script is constant; nothing from data goes into it.
+const REPAIR_SCRIPT: &str = "$ProgressPreference = 'SilentlyContinue'; \
+try { Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe -ErrorAction Stop; \
+Write-Output 'winget is registered.' } \
+catch { Write-Output $_.Exception.Message; \
+Write-Output 'App Installer, which brings winget, is not on this system. Get it from the Microsoft Store or https://aka.ms/getwinget.'; \
+exit 1 }";
+
+pub fn repair_cmd() -> Cmd {
+    Cmd::new("powershell.exe").args(["-NoProfile", "-NonInteractive", "-Command", REPAIR_SCRIPT])
+}
+
 pub fn install_cmd(package: &WingetPackage) -> Cmd {
     Cmd::new("winget").args([
         "install",

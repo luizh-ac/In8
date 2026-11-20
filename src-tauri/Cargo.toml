@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Get a freshly formatted PC ready: apps, debloat, tweaks and post-install setup"
 edition = "2024"
 rust-version = "1.90"
+license = "MIT"
 
 [lib]
 name = "in8_lib"

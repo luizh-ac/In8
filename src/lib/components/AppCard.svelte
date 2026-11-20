@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { CatalogApp, Target } from "../types";
   import { store } from "../store.svelte";
-  import { sourceLabel, text } from "../strings";
+  import { sourceLabel, text } from "../strings.svelte";
 
   let { app }: { app: CatalogApp } = $props();
 
@@ -57,7 +57,7 @@
   </button>
 
   {#if app.wslResolution}
-    <div class="flex gap-1 px-3 pb-3" role="radiogroup" aria-label="Install target for {app.name}">
+    <div class="flex gap-1 px-3 pb-3" role="radiogroup" aria-label={text.apps.targetFor(app.name)}>
       {#each targets as option (option)}
         <button
           type="button"

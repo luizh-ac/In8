@@ -1,7 +1,7 @@
 <script lang="ts">
   import AppCard from "../components/AppCard.svelte";
   import { store } from "../store.svelte";
-  import { categoryLabels, categoryOrder, text } from "../strings";
+  import { categoryLabels, categoryOrder, text } from "../strings.svelte";
 
   let query = $state("");
   let hideUnavailable = $state(true);
@@ -51,6 +51,22 @@
   <p class="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
     {text.apps.noManagers}
   </p>
+{/if}
+
+{#if store.platform?.os === "windows" && !store.platform.managers.includes("winget")}
+  <div class="mt-4 flex flex-wrap items-center gap-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+    <p class="flex-1">{store.repairWinget ? text.apps.wingetQueued : text.apps.noWinget}</p>
+    <button
+      type="button"
+      aria-pressed={store.repairWinget}
+      onclick={() => (store.repairWinget = !store.repairWinget)}
+      class="rounded-md border px-3 py-1.5 text-sm {store.repairWinget
+        ? 'border-indigo-500 bg-indigo-50 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200'
+        : 'border-amber-400 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/40'}"
+    >
+      {store.repairWinget ? "✓ " : ""}{text.apps.repairWinget}
+    </button>
+  </div>
 {/if}
 
 {#if store.platform?.os === "linux" && !store.platform.managers.includes("flatpak") && store.platform.managers.length > 0}

@@ -8,7 +8,7 @@
     saveWslConfig,
   } from "../api";
   import { message, store, type WslToggle } from "../store.svelte";
-  import { text } from "../strings";
+  import { text } from "../strings.svelte";
   import type { OnlineDistro, WslConfig } from "../types";
 
   const status = $derived(store.wsl);

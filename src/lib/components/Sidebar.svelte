@@ -1,6 +1,6 @@
 <script lang="ts">
   import { store, type View } from "../store.svelte";
-  import { text } from "../strings";
+  import { text } from "../strings.svelte";
 
   const items = $derived(
     (

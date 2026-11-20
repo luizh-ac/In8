@@ -9,7 +9,7 @@
   import TweaksView from "./lib/views/TweaksView.svelte";
   import WslView from "./lib/views/WslView.svelte";
   import { store } from "./lib/store.svelte";
-  import { text } from "./lib/strings";
+  import { text } from "./lib/strings.svelte";
   import { onMount } from "svelte";
 
   onMount(() => {

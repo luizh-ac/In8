@@ -1,9 +1,9 @@
 <script lang="ts">
   import { postKey, store } from "../store.svelte";
-  import { text } from "../strings";
+  import { text } from "../strings.svelte";
   import type { InputKind, PostSideState, PostTask, Target } from "../types";
 
-  const t = text.postinstall;
+  const t = $derived(text.postinstall);
   let copied = $state<string | null>(null);
 
   const wslReady = $derived.by(() => {

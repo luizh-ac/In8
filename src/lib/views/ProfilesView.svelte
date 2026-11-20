@@ -1,10 +1,10 @@
 <script lang="ts">
   import { exportBackup, importBackup } from "../api";
   import { message, profileSelection, store, type ApplyResult } from "../store.svelte";
-  import { text, wslActionLabel } from "../strings";
+  import { text, wslActionLabel } from "../strings.svelte";
   import type { ProfileEntry } from "../types";
 
-  const t = text.profiles;
+  const t = $derived(text.profiles);
   const PREVIEW_APPS = 8;
 
   /** Feedback lines for the last action, shown at the top. */

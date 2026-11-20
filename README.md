@@ -38,4 +38,4 @@ bash scripts/build-linux.sh  # Linux (or WSL): AppImage and .deb in src-tauri/ta
 
 ## License
 
-TBD
+[MIT](LICENSE)

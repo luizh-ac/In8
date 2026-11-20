@@ -1,90 +1,50 @@
-// All user-facing text lives here (English for now, ready for i18n later).
-import type { CatalogApp, Category, Target, TaskStatus, Theme, TweakCategory, WslAction } from "./types";
+// English UI text. Every other language mirrors this shape (see pt-BR.ts).
+// Catalog data (app, tweak and task names) and messages from the backend stay in English for now.
+import type { Target, Theme } from "../types";
 
-export const categoryOrder: Category[] = [
-  "browsers",
-  "dev",
-  "communication",
-  "media",
-  "utilities",
-  "gaming",
-  "productivity",
-  "security",
-];
-
-export const categoryLabels: Record<Category, string> = {
-  browsers: "Browsers",
-  dev: "Development",
-  communication: "Communication",
-  media: "Media",
-  utilities: "Utilities",
-  gaming: "Gaming",
-  productivity: "Productivity",
-  security: "Security",
-};
-
-export const tweakCategoryOrder: TweakCategory[] = ["appearance", "explorer", "taskbar", "privacy", "performance"];
-
-export const tweakCategoryLabels: Record<TweakCategory, string> = {
-  appearance: "Appearance",
-  explorer: "File Explorer",
-  taskbar: "Taskbar and Start",
-  privacy: "Privacy",
-  performance: "Performance and gaming",
-};
-
-export const taskStatusLabels: Record<TaskStatus | "pending" | "running", string> = {
-  pending: "Waiting",
-  running: "Running",
-  succeeded: "Installed",
-  done: "Done",
-  removed: "Removed",
-  alreadyInstalled: "Already installed",
-  failed: "Failed",
-  skipped: "Skipped",
-  simulated: "Simulated",
-};
-
-/** Where the app comes from, e.g. "winget", "Microsoft Store", "GitHub", "Flathub", "apt in WSL". */
-export function sourceLabel(app: CatalogApp, target: Target = "host"): string | null {
-  if (target === "wsl") return app.wslResolution?.status === "available" ? "apt in WSL" : null;
-  if (app.resolution.status !== "available") return null;
-  switch (app.resolution.manager) {
-    case "apt":
-      return "apt";
-    case "dnf":
-      return "dnf";
-    case "pacman":
-      return "pacman";
-    case "github":
-      return "GitHub release";
-    case "flatpak": {
-      const flatpak = app.packages.flatpak;
-      return typeof flatpak === "object" ? `Flatpak (${flatpak.remote.name})` : "Flathub";
-    }
-    case "winget": {
-      const winget = app.packages.winget;
-      return typeof winget === "object" && winget.source === "msstore" ? "Microsoft Store" : "winget";
-    }
-  }
-}
-
-export function wslActionLabel(action: WslAction): string {
-  switch (action.kind) {
-    case "installWsl":
-      return "Install WSL";
-    case "installDistro":
-      return `Install the ${action.distro} distro`;
-    case "enableSystemd":
-      return "Turn on systemd";
-    case "dockerEngine":
-      return "Docker Engine in WSL";
-    case "vscodeExtension":
-      return "VS Code WSL extension";
-  }
-}
-
-export const text = {
+export const en = {
+  languageName: "English",
+  categories: {
+    browsers: "Browsers",
+    dev: "Development",
+    communication: "Communication",
+    media: "Media",
+    utilities: "Utilities",
+    gaming: "Gaming",
+    productivity: "Productivity",
+    security: "Security",
+  },
+  tweakCategories: {
+    appearance: "Appearance",
+    explorer: "File Explorer",
+    taskbar: "Taskbar and Start",
+    privacy: "Privacy",
+    performance: "Performance and gaming",
+  },
+  taskStatus: {
+    pending: "Waiting",
+    running: "Running",
+    succeeded: "Installed",
+    done: "Done",
+    removed: "Removed",
+    alreadyInstalled: "Already installed",
+    failed: "Failed",
+    skipped: "Skipped",
+    simulated: "Simulated",
+  },
+  sources: {
+    aptInWsl: "apt in WSL",
+    github: "GitHub release",
+    msstore: "Microsoft Store",
+    flathub: "Flathub",
+  },
+  wslActions: {
+    installWsl: "Install WSL",
+    installDistro: (distro: string) => `Install the ${distro} distro`,
+    enableSystemd: "Turn on systemd",
+    dockerEngine: "Docker Engine in WSL",
+    vscodeExtension: "VS Code WSL extension",
+  },
   tagline: "Your PC, ready from birth.",
   targets: { host: "Windows", wsl: "WSL" } satisfies Record<Target, string>,
   comingSoon: "Coming in a later phase.",
@@ -100,6 +60,7 @@ export const text = {
   apps: {
     title: "Apps",
     searchPlaceholder: "Search apps",
+    targetFor: (name: string) => `Install target for ${name}`,
     hideUnavailable: "Hide unavailable",
     checkInstalled: "Check installed",
     checkingInstalled: "Checking installed apps…",
@@ -108,6 +69,9 @@ export const text = {
     noManagers: "No supported package manager was found on this system.",
     noFlatpak: "Flatpak isn't installed, so apps that only come from Flathub are unavailable.",
     installFlatpak: "Install Flatpak",
+    noWinget: "winget isn't available, so most apps can't be installed. On a fresh Windows it often just needs registering.",
+    repairWinget: "Repair winget",
+    wingetQueued: "winget will be repaired when you run. The apps appear right after.",
     flatpakQueued: "Flatpak will be installed when you run. Flathub apps appear right after.",
   },
   wsl: {
@@ -255,7 +219,7 @@ export const text = {
     intro: "Set things up after the apps are in. Pick where each task runs; WSL needs a distro with a Linux user.",
     checking: "Reading Git, SSH and VS Code…",
     checkAgain: "Check again",
-    hostLabel: (isWindows: boolean) => (isWindows ? "Windows" : "This PC"),
+    hostLabel: (isWindows: boolean): string => (isWindows ? "Windows" : "This PC"),
     wsl: "WSL",
     wslNotReady: "WSL options appear once a distro with a Linux user is set up (WSL screen).",
     needs: (app: string) => `Needs ${app}. Select it in Apps or install it first.`,
@@ -287,6 +251,9 @@ export const text = {
     restartNow: "Restart as administrator",
     dryRun: "Start with Dry run checked",
     dryRunHint: "The review screen starts in simulation mode, showing commands without running them.",
+    language: "Language",
+    languageSystem: "Same as the system",
+    languageHint: "App and tweak names and messages from the system stay in English for now.",
     theme: "Theme",
     themes: { system: "System", light: "Light", dark: "Dark" } satisfies Record<Theme, string>,
     wslDistro: "WSL distro",
@@ -326,6 +293,9 @@ export const text = {
     groups: { debloat: "Remove", apps: "Install", tweaks: "Tweaks", postinstall: "Post-install" },
     revertLabel: (name: string) => `Revert: ${name}`,
     setupFlatpak: "Install Flatpak and add Flathub",
+    repairWinget: "Repair winget",
     askPassword: "Some items install from your distro, so In8 asks for your password once when they start.",
   },
-} as const;
+};
+
+export type Strings = typeof en;

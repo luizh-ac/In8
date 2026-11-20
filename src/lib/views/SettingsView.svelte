@@ -1,9 +1,9 @@
 <script lang="ts">
   import { message, store } from "../store.svelte";
-  import { text } from "../strings";
+  import { languages, text } from "../strings.svelte";
   import type { Settings, Theme } from "../types";
 
-  const t = text.settings;
+  const t = $derived(text.settings);
   const themes: Theme[] = ["system", "light", "dark"];
 
   let error = $state<string | null>(null);
@@ -86,6 +86,23 @@
       <span class="block text-sm font-medium">{t.dryRun}</span>
       <span class="block text-xs text-zinc-500">{t.dryRunHint}</span>
     </span>
+  </label>
+
+  <label class="flex items-center gap-4 px-4 py-4">
+    <span>
+      <span class="block text-sm font-medium">{t.language}</span>
+      <span class="block text-xs text-zinc-500">{t.languageHint}</span>
+    </span>
+    <select
+      value={store.settings.language}
+      onchange={(event) => update({ language: event.currentTarget.value as Settings["language"] })}
+      class="ml-auto rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+    >
+      <option value="system">{t.languageSystem}</option>
+      {#each languages as language (language.value)}
+        <option value={language.value}>{language.label}</option>
+      {/each}
+    </select>
   </label>
 
   <div class="flex items-center gap-4 px-4 py-4">

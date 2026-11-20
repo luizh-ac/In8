@@ -1,7 +1,7 @@
 <script lang="ts">
   import { SvelteSet } from "svelte/reactivity";
   import { message, store, type TaskState } from "../store.svelte";
-  import { sourceLabel, taskStatusLabels, text, wslActionLabel } from "../strings";
+  import { sourceLabel, taskStatusLabels, text, wslActionLabel } from "../strings.svelte";
 
   const expanded = new SvelteSet<string>();
   const started = $derived(store.running || store.tasks.length > 0 || store.runError !== null);
@@ -117,6 +117,11 @@
     {/if}
 
     <ul class="mt-6 divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+      {#if store.repairWinget}
+        <li class="flex items-center gap-3 px-4 py-2 text-sm">
+          <span class="font-medium">{text.run.repairWinget}</span>
+        </li>
+      {/if}
       {#if store.setupFlatpak}
         <li class="flex items-center gap-3 px-4 py-2 text-sm">
           <span class="font-medium">{text.run.setupFlatpak}</span>

@@ -104,6 +104,9 @@ pub struct RunRequest {
     /// Linux: install Flatpak with the distro's package manager and add Flathub.
     #[serde(default)]
     pub setup_flatpak: bool,
+    /// Windows: register App Installer so winget works.
+    #[serde(default)]
+    pub repair_winget: bool,
     #[serde(default)]
     pub postinstall: Vec<crate::postinstall::PostInstallRequest>,
 }
@@ -190,6 +193,12 @@ pub fn plan(
     }
 
     let mut tasks = plan_flatpak_setup(platform, request.setup_flatpak)?;
+    if request.repair_winget && platform.os == Os::Windows && !platform.has(PmId::Winget) {
+        tasks.insert(
+            0,
+            setup_task("repair-winget", "Repair winget", pm::winget::repair_cmd()),
+        );
+    }
     tasks.extend(host_setups);
     tasks.extend(host_installs);
     tasks.extend(plan_wsl(platform, distro, &wsl_apps, &request.wsl)?);
@@ -907,6 +916,25 @@ mod tests {
             Err(Error::Wsl(_))
         ));
         assert!(plan(&catalog, &windows(), Some(&ubuntu(true)), &docker).is_ok());
+    }
+
+    #[test]
+    fn winget_repair_runs_first_and_only_when_winget_is_missing() {
+        let catalog = Catalog::load_embedded().unwrap();
+        let repair = RunRequest {
+            repair_winget: true,
+            ..Default::default()
+        };
+        let missing = platform(Os::Windows, &[PmId::Github]);
+        assert_eq!(
+            task_ids(&plan(&catalog, &missing, None, &repair).unwrap()),
+            ["repair-winget"]
+        );
+        assert!(
+            plan(&catalog, &windows(), None, &repair)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

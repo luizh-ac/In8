@@ -1,9 +1,9 @@
 <script lang="ts">
   import { store } from "../store.svelte";
-  import { text, tweakCategoryLabels, tweakCategoryOrder } from "../strings";
+  import { text, tweakCategoryLabels, tweakCategoryOrder } from "../strings.svelte";
   import type { TweakInfo } from "../types";
 
-  const t = text.tweaks;
+  const t = $derived(text.tweaks);
 
   const groups = $derived(
     tweakCategoryOrder

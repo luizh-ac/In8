@@ -1,9 +1,9 @@
 <script lang="ts">
   import { store } from "../store.svelte";
-  import { text } from "../strings";
+  import { text } from "../strings.svelte";
   import type { DebloatInfo } from "../types";
 
-  const t = text.debloat;
+  const t = $derived(text.debloat);
 
   const installed = $derived(store.debloatItems.filter((item) => item.installed));
   const safe = $derived(installed.filter((item) => item.level === "safe"));

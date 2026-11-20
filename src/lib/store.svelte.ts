@@ -20,7 +20,7 @@ import {
   startRun,
   takePendingSelection,
 } from "./api";
-import { wslActionLabel } from "./strings";
+import { setLanguage, systemLanguage, wslActionLabel } from "./strings.svelte";
 import type {
   AdminStatus,
   CatalogApp,
@@ -86,6 +86,7 @@ const DEFAULT_SETTINGS: Settings = {
   alwaysAdmin: false,
   dryRunByDefault: true,
   theme: "system",
+  language: "system",
   wslDistro: null,
   linuxPreferNative: false,
 };
@@ -103,6 +104,7 @@ export function profileSelection(profile: Profile): RunRequest {
     debloat: profile.debloat,
     postinstall: profile.postinstall,
     setupFlatpak: false,
+    repairWinget: false,
   };
 }
 
@@ -159,6 +161,8 @@ class AppStore {
 
   /** Linux: install Flatpak in the next run. */
   setupFlatpak = $state(false);
+  /** Windows: register winget in the next run. */
+  repairWinget = $state(false);
 
   profiles = $state<ProfileEntry[]>([]);
   profileError = $state<string | null>(null);
@@ -190,7 +194,8 @@ class AppStore {
       this.tweakChoices.size +
       this.debloatSelected.size +
       this.postSelected.size +
-      (this.setupFlatpak ? 1 : 0),
+      (this.setupFlatpak ? 1 : 0) +
+      (this.repairWinget ? 1 : 0),
   );
 
   /** A selected tweak writes to HKLM and In8 isn't elevated (Windows only). */
@@ -232,6 +237,7 @@ class AppStore {
       return;
     }
     this.applyTheme();
+    this.applyLanguage();
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applyTheme());
     await Promise.all([
       this.refreshInstalled(),
@@ -258,11 +264,17 @@ class AppStore {
     document.documentElement.style.colorScheme = dark ? "dark" : "light";
   }
 
+  applyLanguage(): void {
+    const language = this.settings.language;
+    setLanguage(language === "system" ? systemLanguage() : language);
+  }
+
   async updateSettings(patch: Partial<Settings>): Promise<void> {
     const preferNativeChanged =
       patch.linuxPreferNative !== undefined && patch.linuxPreferNative !== this.settings.linuxPreferNative;
     this.settings = await saveSettings({ ...this.settings, ...patch });
     this.applyTheme();
+    this.applyLanguage();
     if (preferNativeChanged) await this.reloadPlatform();
   }
 
@@ -274,6 +286,7 @@ class AppStore {
       if (!this.isAvailable(app)) this.selected.delete(app.id);
     }
     if (this.setupFlatpak && this.platform.managers.includes("flatpak")) this.setupFlatpak = false;
+    if (this.repairWinget && this.platform.managers.includes("winget")) this.repairWinget = false;
     await this.refreshInstalled();
   }
 
@@ -463,6 +476,7 @@ class AppStore {
     this.debloatSelected.clear();
     this.postSelected.clear();
     this.setupFlatpak = false;
+    this.repairWinget = false;
   }
 
   resetRun(): void {
@@ -488,6 +502,7 @@ class AppStore {
         };
       }),
       setupFlatpak: this.setupFlatpak,
+      repairWinget: this.repairWinget,
     };
   }
 
@@ -513,6 +528,7 @@ class AppStore {
       if (this.debloatItems.some((item) => item.id === id && item.installed)) this.debloatSelected.add(id);
     }
     this.setupFlatpak = selection.setupFlatpak;
+    this.repairWinget = selection.repairWinget;
     for (const wanted of selection.postinstall) {
       this.restorePostValues(wanted.id, wanted.values, wanted.options);
       if (this.postTargets(wanted.id).includes(wanted.target)) this.postSelected.add(postKey(wanted.id, wanted.target));
@@ -709,10 +725,11 @@ class AppStore {
       this.tweakChoices.clear();
       this.debloatSelected.clear();
       this.postSelected.clear();
-      const flatpakWasSetUp = this.setupFlatpak;
+      const managersChanged = this.setupFlatpak || this.repairWinget;
       this.setupFlatpak = false;
-      // On Linux a run can add Flatpak (or the distro's packages); detect managers again first.
-      if (this.platform?.os === "linux" || flatpakWasSetUp) await this.reloadPlatform().catch(() => {});
+      this.repairWinget = false;
+      // A run can add Flatpak, winget or the distro's packages; detect managers again first.
+      if (this.platform?.os === "linux" || managersChanged) await this.reloadPlatform().catch(() => {});
       await Promise.all([
         this.refreshInstalled(),
         this.refreshWsl().then(() => this.refreshPostinstall()),

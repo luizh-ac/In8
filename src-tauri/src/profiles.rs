@@ -150,6 +150,7 @@ fn selection_of(profile: &Profile) -> RunRequest {
             .collect(),
         debloat: profile.debloat.clone(),
         setup_flatpak: false,
+        repair_winget: false,
         postinstall: profile.postinstall.clone(),
     }
 }
@@ -234,6 +235,7 @@ pub fn sanitize_selection(catalog: &Catalog, selection: &RunRequest) -> (RunRequ
             debloat,
             // Installing Flatpak is about this machine, so it never travels in profiles or backups.
             setup_flatpak: false,
+            repair_winget: false,
             postinstall: postinstall::sanitize_requests(&selection.postinstall),
         },
         unknown,

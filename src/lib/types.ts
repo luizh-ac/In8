@@ -139,6 +139,8 @@ export interface RunRequest {
   postinstall: PostInstallRequest[];
   /** Linux: install Flatpak from the distro and add Flathub. */
   setupFlatpak: boolean;
+  /** Windows: register App Installer so winget works. */
+  repairWinget: boolean;
 }
 
 // runner.rs ("done": a setup step or tweak finished; "removed": a debloat item was uninstalled)
@@ -227,12 +229,14 @@ export interface DebloatInfo extends DebloatItem {
 
 // settings.rs
 export type Theme = "system" | "light" | "dark";
+export type LanguageSetting = "system" | "en" | "pt-BR";
 
 export interface Settings {
   /** Windows only: relaunch through UAC on start. */
   alwaysAdmin: boolean;
   dryRunByDefault: boolean;
   theme: Theme;
+  language: LanguageSetting;
   wslDistro: string | null;
   /** Linux: install from the distro's packages before Flatpak. */
   linuxPreferNative: boolean;

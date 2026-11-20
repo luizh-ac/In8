@@ -18,6 +18,7 @@ pub struct Settings {
     /// The run screen starts with "Dry run" checked.
     pub dry_run_by_default: bool,
     pub theme: Theme,
+    pub language: Language,
     /// The WSL distro In8 works with; `None` uses the default distro.
     pub wsl_distro: Option<String>,
     /// Linux: install from the distro's packages before Flatpak when an app has both.
@@ -30,6 +31,7 @@ impl Default for Settings {
             always_admin: false,
             dry_run_by_default: true,
             theme: Theme::System,
+            language: Language::System,
             wsl_distro: None,
             linux_prefer_native: false,
         }
@@ -43,6 +45,18 @@ pub enum Theme {
     System,
     Light,
     Dark,
+}
+
+/// UI language; `system` follows the operating system's language.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub enum Language {
+    #[default]
+    #[serde(rename = "system")]
+    System,
+    #[serde(rename = "en")]
+    En,
+    #[serde(rename = "pt-BR")]
+    PtBr,
 }
 
 pub struct SettingsStore {
@@ -123,6 +137,7 @@ mod tests {
             always_admin: true,
             dry_run_by_default: false,
             theme: Theme::Dark,
+            language: Language::PtBr,
             wsl_distro: Some("Ubuntu-24.04".into()),
             linux_prefer_native: true,
         };
