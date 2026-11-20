@@ -7,6 +7,7 @@ mod exec;
 mod ini;
 mod platform;
 mod pm;
+mod postinstall;
 mod profiles;
 mod resolve;
 mod runner;
@@ -54,7 +55,9 @@ pub fn run() {
             let catalog = Arc::new(catalog::Catalog::load_embedded()?);
             let tweak_catalog = Arc::new(tweaks::TweakCatalog::load_embedded()?);
             let debloat_catalog = Arc::new(debloat::DebloatCatalog::load_embedded()?);
-            let builtin_profiles = profiles::builtin(&catalog, &tweak_catalog, &debloat_catalog)?;
+            let post_catalog = Arc::new(postinstall::PostInstallCatalog::load_embedded()?);
+            let builtin_profiles =
+                profiles::builtin(&catalog, &tweak_catalog, &debloat_catalog, &post_catalog)?;
             log::info!(
                 "In8 {} on {:?}, managers: {:?}, elevated: {elevated}",
                 platform.version,
@@ -74,6 +77,7 @@ pub fn run() {
                 tweaks: tweak_catalog,
                 debloat: debloat_catalog,
                 tweak_state: Arc::new(tweaks::TweakState::new(&config_dir)),
+                postinstall: post_catalog,
                 settings: Mutex::new(settings),
                 admin: commands::AdminStatus {
                     elevated,
@@ -103,6 +107,7 @@ pub fn run() {
             commands::import_backup,
             commands::get_tweaks,
             commands::get_debloat,
+            commands::get_postinstall,
             commands::get_settings,
             commands::save_settings,
             commands::get_admin_status,

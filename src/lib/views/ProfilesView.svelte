@@ -112,6 +112,7 @@
             store.isWindows ? profile.wsl.length : 0,
             profile.tweaks.filter((id) => store.tweaks.some((tweak) => tweak.id === id)).length,
             store.isWindows ? profile.debloat.length : 0,
+            profile.postinstall.length,
           )}</p>
       </div>
       <button

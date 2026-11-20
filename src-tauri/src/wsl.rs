@@ -104,6 +104,38 @@ pub fn inside(distro: &str, root: bool, cmd: Cmd) -> Cmd {
     wrapped
 }
 
+/// Runs `cmd` in the distro as its default (Linux) user, starting in their home folder.
+pub fn in_home(distro: &str, cmd: Cmd) -> Cmd {
+    let Cmd {
+        program,
+        args,
+        input,
+        ..
+    } = cmd;
+    let mut wrapped = wsl()
+        .args(["-d", distro, "--cd", "~", "--exec"])
+        .arg(program)
+        .args(args);
+    wrapped.input = input;
+    wrapped
+}
+
+/// VS Code's `code` script for use inside WSL (next to `code.cmd`), as a Linux path. Asks `wslpath`,
+/// so it works whatever the distro's mount root is.
+pub fn code_shim_in(distro: &str) -> Option<String> {
+    let shim = find_code()?.with_file_name("code");
+    if !shim.is_file() {
+        return None;
+    }
+    let output = exec::capture(
+        &wsl()
+            .args(["-d", distro, "--exec", "wslpath", "-u"])
+            .arg(shim.to_string_lossy()),
+    )?;
+    let path = output.trim();
+    (!path.is_empty()).then(|| path.to_string())
+}
+
 pub fn status(preferred: Option<&str>) -> WslStatus {
     let version = exec::capture(&wsl().arg("--version")).map(|output| parse_version(&output));
     let installed = version.is_some();

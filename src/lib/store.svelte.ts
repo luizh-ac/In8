@@ -7,6 +7,7 @@ import {
   getDebloat,
   getInstalled,
   getPlatform,
+  getPostinstall,
   getProfiles,
   getSettings,
   getTweaks,
@@ -24,6 +25,8 @@ import type {
   CatalogApp,
   DebloatInfo,
   PlatformInfo,
+  PostInstallInfo,
+  PostTask,
   Profile,
   ProfileEntry,
   Resolution,
@@ -96,7 +99,13 @@ export function profileSelection(profile: Profile): RunRequest {
     wsl: profile.wsl,
     tweaks: profile.tweaks.map((id) => ({ id, revert: false })),
     debloat: profile.debloat,
+    postinstall: profile.postinstall,
   };
+}
+
+/** Key of a chosen post-install task: one task can run on Windows and in WSL. */
+export function postKey(id: string, target: Target): string {
+  return `${id}@${target}`;
 }
 
 class AppStore {
@@ -134,6 +143,17 @@ class AppStore {
   debloatError = $state<string | null>(null);
   debloatSelected = new SvelteSet<string>();
 
+  postTasks = $state<PostTask[]>([]);
+  postState = $state<PostInstallInfo["state"] | null>(null);
+  checkingPost = $state(false);
+  postError = $state<string | null>(null);
+  /** Chosen post-install tasks, as postKey(id, target). */
+  postSelected = new SvelteSet<string>();
+  /** Typed values per task ID (shared by its Windows and WSL runs). */
+  postValues = new SvelteMap<string, Record<string, string>>();
+  /** Picked options per task ID (e.g. VS Code extensions). */
+  postOptions = new SvelteMap<string, string[]>();
+
   profiles = $state<ProfileEntry[]>([]);
   profileError = $state<string | null>(null);
 
@@ -159,7 +179,11 @@ class AppStore {
   });
 
   selectionCount = $derived(
-    this.selected.size + this.pendingWslActions.length + this.tweakChoices.size + this.debloatSelected.size,
+    this.selected.size +
+      this.pendingWslActions.length +
+      this.tweakChoices.size +
+      this.debloatSelected.size +
+      this.postSelected.size,
   );
 
   /** A selected tweak writes to HKLM and In8 isn't elevated (Windows only). */
@@ -204,7 +228,8 @@ class AppStore {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => this.applyTheme());
     await Promise.all([
       this.refreshInstalled(),
-      this.refreshWsl(this.settings.wslDistro ?? undefined),
+      // Post-install reads the distro, so it waits for WSL.
+      this.refreshWsl(this.settings.wslDistro ?? undefined).then(() => this.refreshPostinstall()),
       this.loadProfiles(),
       this.refreshTweaks(),
       this.refreshDebloat(),
@@ -304,6 +329,76 @@ class AppStore {
     }
   }
 
+  async refreshPostinstall(): Promise<void> {
+    if (this.checkingPost) return;
+    this.checkingPost = true;
+    try {
+      const info = await getPostinstall();
+      this.postTasks = info.tasks;
+      this.postState = info.state;
+      this.postError = null;
+      this.prefillPostValues();
+      for (const key of this.postSelected) {
+        const [id, target] = key.split("@") as [string, Target];
+        if (!this.postTargets(id).includes(target)) this.postSelected.delete(key);
+      }
+    } catch (error) {
+      this.postError = message(error);
+    } finally {
+      this.checkingPost = false;
+    }
+  }
+
+  /** Defaults for tasks nothing was typed into yet: input defaults, current Git identity, every option. */
+  private prefillPostValues(): void {
+    const sides = [this.postState?.host, this.postState?.wsl].filter((side) => side != null);
+    const gitName = sides.find((side) => side.gitName)?.gitName ?? "";
+    const gitEmail = sides.find((side) => side.gitEmail)?.gitEmail ?? "";
+    for (const task of this.postTasks) {
+      if (!this.postValues.has(task.id)) {
+        const values: Record<string, string> = {};
+        for (const input of task.inputs) {
+          values[input.id] =
+            input.kind === "email" ? gitEmail : task.id === "git-identity" && input.id === "name" ? gitName : input.default;
+        }
+        this.postValues.set(task.id, values);
+      }
+      if (task.options.length > 0 && !this.postOptions.has(task.id)) {
+        this.postOptions.set(
+          task.id,
+          task.options.map((option) => option.id),
+        );
+      }
+    }
+  }
+
+  /** Where a post-install task can run here: WSL only on Windows with a ready distro. */
+  postTargets(id: string): Target[] {
+    const task = this.postTasks.find((t) => t.id === id);
+    if (!task) return [];
+    const active = this.wsl?.active;
+    const wslReady = this.isWindows && !!active && active.hasUser && active.apt;
+    return task.targets.filter((target) => target === "host" || wslReady);
+  }
+
+  togglePost(id: string, target: Target): void {
+    const key = postKey(id, target);
+    if (this.postSelected.has(key)) this.postSelected.delete(key);
+    else this.postSelected.add(key);
+  }
+
+  setPostValue(id: string, input: string, value: string): void {
+    this.postValues.set(id, { ...(this.postValues.get(id) ?? {}), [input]: value });
+  }
+
+  togglePostOption(id: string, option: string): void {
+    const current = this.postOptions.get(id) ?? [];
+    this.postOptions.set(
+      id,
+      current.includes(option) ? current.filter((o) => o !== option) : [...current, option],
+    );
+  }
+
   setTarget(app: CatalogApp, target: Target): void {
     this.targets.set(app.id, target);
     if (this.selected.has(app.id) && !this.isAvailable(app)) this.selected.delete(app.id);
@@ -345,6 +440,7 @@ class AppStore {
     this.distroToInstall = null;
     this.tweakChoices.clear();
     this.debloatSelected.clear();
+    this.postSelected.clear();
   }
 
   resetRun(): void {
@@ -360,6 +456,15 @@ class AppStore {
       wsl: this.pendingWslActions,
       tweaks: [...this.tweakChoices].map(([id, choice]) => ({ id, revert: choice === "revert" })),
       debloat: [...this.debloatSelected],
+      postinstall: [...this.postSelected].map((key) => {
+        const [id, target] = key.split("@") as [string, Target];
+        return {
+          id,
+          target,
+          values: { ...(this.postValues.get(id) ?? {}) },
+          options: [...(this.postOptions.get(id) ?? [])],
+        };
+      }),
     };
   }
 
@@ -384,6 +489,15 @@ class AppStore {
     for (const id of selection.debloat) {
       if (this.debloatItems.some((item) => item.id === id && item.installed)) this.debloatSelected.add(id);
     }
+    for (const wanted of selection.postinstall) {
+      this.restorePostValues(wanted.id, wanted.values, wanted.options);
+      if (this.postTargets(wanted.id).includes(wanted.target)) this.postSelected.add(postKey(wanted.id, wanted.target));
+    }
+  }
+
+  private restorePostValues(id: string, values: Record<string, string>, options: string[]): void {
+    if (Object.keys(values).length > 0) this.postValues.set(id, { ...(this.postValues.get(id) ?? {}), ...values });
+    if (options.length > 0) this.postOptions.set(id, [...options]);
   }
 
   /**
@@ -433,6 +547,25 @@ class AppStore {
       if (!item?.installed || this.debloatSelected.has(id)) continue;
       this.debloatSelected.add(id);
       result.selected++;
+    }
+
+    for (const wanted of selection.postinstall) {
+      const task = this.postTasks.find((t) => t.id === wanted.id);
+      if (!task) continue;
+      // Without WSL, tasks that also run on the host run there instead.
+      let target: Target = wanted.target;
+      if (target === "wsl" && !this.isWindows) {
+        if (!task.targets.includes("host")) continue;
+        target = "host";
+      }
+      if (!this.postTargets(task.id).includes(target)) {
+        if (target === "wsl") result.needsWslSetup = true;
+        continue;
+      }
+      this.restorePostValues(task.id, wanted.values, wanted.options);
+      const key = postKey(task.id, target);
+      if (!this.postSelected.has(key)) result.selected++;
+      this.postSelected.add(key);
     }
 
     if (!this.isWindows) return result;
@@ -551,7 +684,13 @@ class AppStore {
       this.distroToInstall = null;
       this.tweakChoices.clear();
       this.debloatSelected.clear();
-      await Promise.all([this.refreshInstalled(), this.refreshWsl(), this.refreshTweaks(), this.refreshDebloat()]);
+      this.postSelected.clear();
+      await Promise.all([
+        this.refreshInstalled(),
+        this.refreshWsl().then(() => this.refreshPostinstall()),
+        this.refreshTweaks(),
+        this.refreshDebloat(),
+      ]);
     }
   }
 

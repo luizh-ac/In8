@@ -186,8 +186,9 @@ export const text = {
     delete: "Delete",
     confirmDelete: "Confirm delete",
     cancel: "Cancel",
-    counts: (apps: number, wsl: number, tweaks: number, debloat: number) =>
+    counts: (apps: number, wsl: number, tweaks: number, debloat: number, post: number) =>
       [
+        post > 0 ? (post === 1 ? "1 setup task" : `${post} setup tasks`) : null,
         apps > 0 ? (apps === 1 ? "1 app" : `${apps} apps`) : null,
         wsl > 0 ? (wsl === 1 ? "1 WSL option" : `${wsl} WSL options`) : null,
         tweaks > 0 ? (tweaks === 1 ? "1 tweak" : `${tweaks} tweaks`) : null,
@@ -241,6 +242,31 @@ export const text = {
     nothing: "Nothing from the list is installed. Already clean.",
     selectSafe: "Select all safe",
   },
+  postinstall: {
+    title: "Post-install",
+    intro: "Set things up after the apps are in. Pick where each task runs; WSL needs a distro with a Linux user.",
+    checking: "Reading Git, SSH and VS Code…",
+    checkAgain: "Check again",
+    hostLabel: (isWindows: boolean) => (isWindows ? "Windows" : "This PC"),
+    wsl: "WSL",
+    wslNotReady: "WSL options appear once a distro with a Linux user is set up (WSL screen).",
+    needs: (app: string) => `Needs ${app}. Select it in Apps or install it first.`,
+    current: (where: string, value: string) => `Now on ${where}: ${value}`,
+    installed: "installed",
+    publicKey: (where: string) => `Public key on ${where}`,
+    copy: "Copy",
+    copied: "Copied",
+    githubHint: "Add it on GitHub: Settings → SSH and GPG keys → New SSH key.",
+    selectAll: "All",
+    selectNone: "None",
+    invalid: {
+      required: "Required.",
+      email: "Enter an email address.",
+      gitUrl: "Use https://… or git@…",
+      folder: "A folder inside your home folder, like dev or code/work.",
+    },
+    reviewLabel: (name: string, where: string) => `${name} (${where})`,
+  },
   settings: {
     title: "Settings",
     alwaysAdmin: "Always run as administrator",
@@ -286,7 +312,7 @@ export const text = {
     confirmAdvanced: (names: string[]) =>
       `I understand that removing ${names.join(", ")} can break something I use.`,
     signOut: "Some changes show up fully after you sign out of Windows or restart.",
-    groups: { debloat: "Remove", apps: "Install", tweaks: "Tweaks" },
+    groups: { debloat: "Remove", apps: "Install", tweaks: "Tweaks", postinstall: "Post-install" },
     revertLabel: (name: string) => `Revert: ${name}`,
   },
 } as const;

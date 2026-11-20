@@ -7,6 +7,14 @@
   const started = $derived(store.running || store.tasks.length > 0 || store.runError !== null);
   const advancedDebloat = $derived(store.selectedDebloat.filter((item) => item.level === "advanced"));
   let confirmedAdvanced = $state(false);
+  const postItems = $derived(
+    [...store.postSelected].map((key) => {
+      const [id, target] = key.split("@");
+      const name = store.postTasks.find((task) => task.id === id)?.name ?? id;
+      const where = target === "wsl" ? text.targets.wsl : text.postinstall.hostLabel(store.isWindows);
+      return { key, label: text.postinstall.reviewLabel(name, where) };
+    }),
+  );
   let restarting = $state(false);
   let adminDeclined = $state(false);
 
@@ -118,6 +126,12 @@
         <li class="flex items-center gap-3 px-4 py-2 text-sm">
           <span class="font-medium">{wslActionLabel(action)}</span>
           <span class="ml-auto text-xs text-zinc-400">{text.targets.wsl}</span>
+        </li>
+      {/each}
+      {#each postItems as item (item.key)}
+        <li class="flex items-center gap-3 px-4 py-2 text-sm">
+          <span class="font-medium">{item.label}</span>
+          <span class="ml-auto text-xs text-zinc-400">{text.run.groups.postinstall}</span>
         </li>
       {/each}
       {#each store.selectedTweaks as tweak (tweak.id)}

@@ -1,5 +1,6 @@
 //! Commands are always a program plus a list of arguments. Nothing here builds a shell string.
 
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use serde::Serialize;
@@ -12,6 +13,8 @@ pub struct Cmd {
     pub env: Vec<(String, String)>,
     /// Text written to the process's stdin (e.g. file contents for `tee`).
     pub input: Option<String>,
+    /// Working directory; the current one when `None`.
+    pub cwd: Option<PathBuf>,
 }
 
 impl Cmd {
@@ -21,7 +24,13 @@ impl Cmd {
             args: Vec::new(),
             env: Vec::new(),
             input: None,
+            cwd: None,
         }
+    }
+
+    pub fn cwd(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.cwd = Some(dir.into());
+        self
     }
 
     pub fn env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
@@ -71,9 +80,77 @@ impl Cmd {
             })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        if let Some(dir) = &self.cwd {
+            command.current_dir(dir);
+        }
         hide_console_window(&mut command);
         command
     }
+
+    /// A process in its own console window, for programs the user types into (e.g. `ssh-keygen` asking
+    /// for a passphrase). Nothing is piped, so In8 never sees what is typed.
+    pub fn to_console_command(&self) -> Command {
+        let mut command = Command::new(&self.program);
+        command
+            .args(&self.args)
+            .envs(self.env.iter().map(|(key, value)| (key, value)));
+        if let Some(dir) = &self.cwd {
+            command.current_dir(dir);
+        }
+        new_console_window(&mut command);
+        command
+    }
+}
+
+/// Finds a program that may have been installed after In8 started (its PATH is from that moment):
+/// the PATH first, then the folders its Windows installer uses. Falls back to the bare name.
+pub fn locate(program: &str) -> String {
+    if on_path(program) {
+        return program.to_string();
+    }
+    known_locations(program)
+        .into_iter()
+        .find(|path| path.is_file())
+        .map_or_else(
+            || program.to_string(),
+            |path| path.to_string_lossy().into_owned(),
+        )
+}
+
+fn on_path(program: &str) -> bool {
+    let names: Vec<String> = if cfg!(windows) {
+        vec![format!("{program}.exe"), format!("{program}.cmd")]
+    } else {
+        vec![program.to_string()]
+    };
+    std::env::var_os("PATH").is_some_and(|path| {
+        std::env::split_paths(&path).any(|dir| names.iter().any(|name| dir.join(name).is_file()))
+    })
+}
+
+fn known_locations(program: &str) -> Vec<PathBuf> {
+    if !cfg!(windows) {
+        return Vec::new();
+    }
+    let env_dir = |key: &str| std::env::var_os(key).map(PathBuf::from);
+    match program {
+        "git" => ["ProgramFiles", "ProgramW6432"]
+            .iter()
+            .filter_map(|key| env_dir(key))
+            .map(|dir| dir.join("Git").join("cmd").join("git.exe"))
+            .collect(),
+        "rustup" => env_dir("USERPROFILE")
+            .map(|home| home.join(".cargo").join("bin").join("rustup.exe"))
+            .into_iter()
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// The user's home folder.
+pub fn home_dir() -> Option<PathBuf> {
+    let key = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+    std::env::var_os(key).map(PathBuf::from)
 }
 
 /// Runs a short command and returns its stdout if it exits successfully.
@@ -108,6 +185,17 @@ fn hide_console_window(command: &mut Command) {
 
 #[cfg(not(windows))]
 fn hide_console_window(_command: &mut Command) {}
+
+#[cfg(windows)]
+fn new_console_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+    command.creation_flags(CREATE_NEW_CONSOLE);
+}
+
+/// Linux has no console windows to open; the program inherits the terminal In8 was started from, if any.
+#[cfg(not(windows))]
+fn new_console_window(_command: &mut Command) {}
 
 #[cfg(test)]
 mod tests {

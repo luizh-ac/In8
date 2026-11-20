@@ -2,6 +2,7 @@
   import Sidebar from "./lib/components/Sidebar.svelte";
   import AppsView from "./lib/views/AppsView.svelte";
   import DebloatView from "./lib/views/DebloatView.svelte";
+  import PostInstallView from "./lib/views/PostInstallView.svelte";
   import ProfilesView from "./lib/views/ProfilesView.svelte";
   import RunView from "./lib/views/RunView.svelte";
   import SettingsView from "./lib/views/SettingsView.svelte";
@@ -19,7 +20,7 @@
     store.view === "apps" || store.view === "run" ? "" : text.nav[store.view],
   );
   const showBar = $derived(
-    ["apps", "profiles", "wsl", "tweaks", "debloat"].includes(store.view) &&
+    ["apps", "profiles", "wsl", "tweaks", "debloat", "postinstall"].includes(store.view) &&
       store.selectionCount > 0,
   );
 
@@ -48,6 +49,8 @@
         <TweaksView />
       {:else if store.view === "debloat"}
         <DebloatView />
+      {:else if store.view === "postinstall"}
+        <PostInstallView />
       {:else if store.view === "settings"}
         <SettingsView />
       {:else if store.view === "run"}

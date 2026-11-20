@@ -17,6 +17,7 @@ use crate::elevation::{self, Relaunch};
 use crate::error::{Error, Result};
 use crate::platform::{Os, PlatformInfo};
 use crate::pm::{self, PmId, apt};
+use crate::postinstall::{self, PostInstallCatalog, PostInstallState, PostTask};
 use crate::profiles::{self, ImportResult, Profile, ProfileEntry, UserProfiles};
 use crate::resolve::{Resolution, resolve, resolve_wsl};
 use crate::runner::{self, RunEvent, RunRequest, RunSummary, SystemContext};
@@ -34,6 +35,7 @@ pub struct AppState {
     pub tweaks: Arc<TweakCatalog>,
     pub debloat: Arc<DebloatCatalog>,
     pub tweak_state: Arc<TweakState>,
+    pub postinstall: Arc<PostInstallCatalog>,
     pub settings: Mutex<SettingsStore>,
     pub admin: AdminStatus,
     /// The selection handed over to the elevated copy by "Restart as administrator".
@@ -214,13 +216,14 @@ pub async fn start_run(
     let tweak_catalog = Arc::clone(&state.tweaks);
     let debloat_catalog = Arc::clone(&state.debloat);
     let tweak_state = Arc::clone(&state.tweak_state);
+    let post_catalog = Arc::clone(&state.postinstall);
     let result = blocking(move || {
         let context = SystemContext {
             tweaks: &tweak_catalog,
             debloat: &debloat_catalog,
             state: &tweak_state,
         };
-        // Debloat first, then apps and WSL, then tweaks.
+        // Debloat first, then apps and WSL, then post-install, then tweaks.
         let (mut tasks, tweak_tasks) = runner::plan_system(&context, &platform, &request)?;
         tasks.extend(runner::plan(
             &catalog,
@@ -228,7 +231,18 @@ pub async fn start_run(
             distro.as_ref(),
             &request,
         )?);
+        let apt_update_planned = tasks.iter().any(|task| task.id == "wsl-apt-update");
+        tasks.extend(postinstall::plan(
+            &post_catalog,
+            &platform,
+            distro.as_ref(),
+            &request.postinstall,
+            apt_update_planned,
+        )?);
         tasks.extend(tweak_tasks);
+        // Steps asked for twice (e.g. the VS Code WSL extension) run once, where they first appear.
+        let mut seen = HashSet::new();
+        tasks.retain(|task| seen.insert(task.id.clone()));
         Ok(runner::run(&tasks, dry_run, |event| {
             let _ = on_event.send(event);
         }))
@@ -236,6 +250,26 @@ pub async fn start_run(
     .await;
     running.store(false, Ordering::SeqCst);
     result?
+}
+
+/// Post-install tasks for this system plus what's already set up (Git identity, SSH keys, extensions).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PostInstallInfo {
+    pub tasks: Vec<PostTask>,
+    pub state: PostInstallState,
+}
+
+#[tauri::command]
+pub async fn get_postinstall(state: State<'_, AppState>) -> Result<PostInstallInfo> {
+    let catalog = Arc::clone(&state.postinstall);
+    let platform = Arc::clone(&state.platform);
+    let distro = state.wsl_distro();
+    blocking(move || PostInstallInfo {
+        tasks: catalog.tasks.clone(),
+        state: postinstall::read_state(&platform, distro.as_ref()),
+    })
+    .await
 }
 
 /// Tweaks for this system with their current state. Reads the registry or gsettings.

@@ -96,6 +96,8 @@ pub struct RunRequest {
     /// Debloat item IDs to remove.
     #[serde(default)]
     pub debloat: Vec<String>,
+    #[serde(default)]
+    pub postinstall: Vec<crate::postinstall::PostInstallRequest>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -449,6 +451,49 @@ fn execute(task: &Task, emit: &mut impl FnMut(RunEvent)) -> (TaskStatus, Option<
                 return (TaskStatus::Failed, None);
             }
         },
+        InstallAction::VscodeWslExtension { distro, extension } => {
+            match wsl::code_shim_in(distro) {
+                Some(shim) => {
+                    let cmd = wsl::in_home(
+                        distro,
+                        Cmd::new(shim).args(["--install-extension", extension.as_str()]),
+                    );
+                    run_process(&task.id, &cmd, emit)
+                }
+                None => {
+                    emit(output(
+                        "VS Code wasn't found on Windows. Install it first, then try again.".into(),
+                    ));
+                    return (TaskStatus::Failed, None);
+                }
+            }
+        }
+        InstallAction::HostTool(cmd) => {
+            let mut cmd = cmd.clone();
+            cmd.program = crate::exec::locate(&cmd.program);
+            run_process(&task.id, &cmd, emit)
+        }
+        InstallAction::CreateDir(path) => {
+            let existed = path.is_dir();
+            return match std::fs::create_dir_all(path) {
+                Ok(()) => {
+                    let what = if existed { "Already there" } else { "Created" };
+                    emit(output(format!("{what}: {}", path.display())));
+                    (TaskStatus::Done, Some(0))
+                }
+                Err(error) => {
+                    emit(output(format!(
+                        "Couldn't create {}: {error}",
+                        path.display()
+                    )));
+                    (TaskStatus::Failed, None)
+                }
+            };
+        }
+        InstallAction::SshKey(job) => {
+            let mut log = |line: String| emit(output(line));
+            crate::postinstall::run_ssh_key(job, &mut log)
+        }
     };
     (status_for(task.kind, code), code)
 }

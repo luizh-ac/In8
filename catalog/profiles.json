@@ -6,55 +6,188 @@
       "name": "My setup",
       "description": "Everything in the catalog with the dev tools inside WSL, every tweak and the basic debloat list.",
       "tweaks": [
-        "dark-mode", "show-file-extensions", "show-hidden-files", "explorer-opens-this-pc", "classic-context-menu",
-        "taskbar-left", "hide-widgets", "hide-task-view", "hide-search-box", "hide-copilot-button", "taskbar-end-task",
-        "no-web-search-in-start", "no-start-recommendations",
-        "required-diagnostic-data", "no-advertising-id", "no-tailored-experiences", "no-suggestions",
-        "no-lock-screen-tips", "no-activity-history",
-        "game-mode", "no-mouse-acceleration", "high-performance-power",
-        "gnome-dark-mode", "gnome-window-buttons", "gnome-battery-percentage", "gnome-clock-weekday"
+        "dark-mode",
+        "show-file-extensions",
+        "show-hidden-files",
+        "explorer-opens-this-pc",
+        "classic-context-menu",
+        "taskbar-left",
+        "hide-widgets",
+        "hide-task-view",
+        "hide-search-box",
+        "hide-copilot-button",
+        "taskbar-end-task",
+        "no-web-search-in-start",
+        "no-start-recommendations",
+        "required-diagnostic-data",
+        "no-advertising-id",
+        "no-tailored-experiences",
+        "no-suggestions",
+        "no-lock-screen-tips",
+        "no-activity-history",
+        "game-mode",
+        "no-mouse-acceleration",
+        "high-performance-power",
+        "gnome-dark-mode",
+        "gnome-window-buttons",
+        "gnome-battery-percentage",
+        "gnome-clock-weekday"
       ],
       "debloat": [
-        "clipchamp", "news", "weather", "bing-search", "solitaire", "tips", "get-help", "feedback-hub", "maps",
-        "todo", "power-automate", "family", "office-hub", "cortana", "dev-home"
+        "clipchamp",
+        "news",
+        "weather",
+        "bing-search",
+        "solitaire",
+        "tips",
+        "get-help",
+        "feedback-hub",
+        "maps",
+        "todo",
+        "power-automate",
+        "family",
+        "office-hub",
+        "cortana",
+        "dev-home"
       ],
       "apps": [
-        { "id": "chrome" },
-        { "id": "brave" },
-        { "id": "vscode" },
-        { "id": "git", "target": "wsl" },
-        { "id": "nodejs", "target": "wsl" },
-        { "id": "python", "target": "wsl" },
-        { "id": "rust", "target": "wsl" },
-        { "id": "discord" },
-        { "id": "whatsapp" },
-        { "id": "whatsapp-beta" },
-        { "id": "teams" },
-        { "id": "spotify" },
-        { "id": "youtube-music" },
-        { "id": "stremio" },
-        { "id": "netflix" },
-        { "id": "prime-video" },
-        { "id": "7zip" },
-        { "id": "qbittorrent" },
-        { "id": "steam" },
-        { "id": "epic-games" },
-        { "id": "ea-app" },
-        { "id": "ubisoft-connect" },
-        { "id": "battlenet" },
-        { "id": "curseforge" },
-        { "id": "hydra" },
-        { "id": "google-play-games" },
-        { "id": "notion" },
-        { "id": "obsidian" },
-        { "id": "artcraft-launcher" },
-        { "id": "claude" },
-        { "id": "protonvpn" }
+        {
+          "id": "chrome"
+        },
+        {
+          "id": "brave"
+        },
+        {
+          "id": "vscode"
+        },
+        {
+          "id": "git",
+          "target": "wsl"
+        },
+        {
+          "id": "nodejs",
+          "target": "wsl"
+        },
+        {
+          "id": "python",
+          "target": "wsl"
+        },
+        {
+          "id": "rust",
+          "target": "wsl"
+        },
+        {
+          "id": "discord"
+        },
+        {
+          "id": "whatsapp"
+        },
+        {
+          "id": "whatsapp-beta"
+        },
+        {
+          "id": "teams"
+        },
+        {
+          "id": "spotify"
+        },
+        {
+          "id": "youtube-music"
+        },
+        {
+          "id": "stremio"
+        },
+        {
+          "id": "netflix"
+        },
+        {
+          "id": "prime-video"
+        },
+        {
+          "id": "7zip"
+        },
+        {
+          "id": "qbittorrent"
+        },
+        {
+          "id": "steam"
+        },
+        {
+          "id": "epic-games"
+        },
+        {
+          "id": "ea-app"
+        },
+        {
+          "id": "ubisoft-connect"
+        },
+        {
+          "id": "battlenet"
+        },
+        {
+          "id": "curseforge"
+        },
+        {
+          "id": "hydra"
+        },
+        {
+          "id": "google-play-games"
+        },
+        {
+          "id": "notion"
+        },
+        {
+          "id": "obsidian"
+        },
+        {
+          "id": "artcraft-launcher"
+        },
+        {
+          "id": "claude"
+        },
+        {
+          "id": "protonvpn"
+        }
       ],
       "wsl": [
-        { "kind": "enableSystemd" },
-        { "kind": "dockerEngine" },
-        { "kind": "vscodeExtension" }
+        {
+          "kind": "enableSystemd"
+        },
+        {
+          "kind": "dockerEngine"
+        },
+        {
+          "kind": "vscodeExtension"
+        }
+      ],
+      "postinstall": [
+        {
+          "id": "rust-toolchain",
+          "target": "wsl"
+        },
+        {
+          "id": "python-tools",
+          "target": "wsl"
+        },
+        {
+          "id": "dev-folder",
+          "target": "wsl"
+        },
+        {
+          "id": "vscode-extensions",
+          "target": "wsl",
+          "options": [
+            "rust-lang.rust-analyzer",
+            "svelte.svelte-vscode",
+            "bradlc.vscode-tailwindcss",
+            "ms-python.python",
+            "dbaeumer.vscode-eslint",
+            "esbenp.prettier-vscode",
+            "ms-azuretools.vscode-containers",
+            "tamasfe.even-better-toml",
+            "eamodio.gitlens"
+          ]
+        }
       ]
     },
     {
@@ -62,11 +195,21 @@
       "name": "Essentials",
       "description": "Browsers, archives, downloads and a VPN.",
       "apps": [
-        { "id": "chrome" },
-        { "id": "brave" },
-        { "id": "7zip" },
-        { "id": "qbittorrent" },
-        { "id": "protonvpn" }
+        {
+          "id": "chrome"
+        },
+        {
+          "id": "brave"
+        },
+        {
+          "id": "7zip"
+        },
+        {
+          "id": "qbittorrent"
+        },
+        {
+          "id": "protonvpn"
+        }
       ]
     },
     {
@@ -74,16 +217,65 @@
       "name": "Dev on WSL",
       "description": "VS Code on Windows; Git, Node.js, Python, Rust and Docker Engine inside WSL.",
       "apps": [
-        { "id": "vscode" },
-        { "id": "git", "target": "wsl" },
-        { "id": "nodejs", "target": "wsl" },
-        { "id": "python", "target": "wsl" },
-        { "id": "rust", "target": "wsl" }
+        {
+          "id": "vscode"
+        },
+        {
+          "id": "git",
+          "target": "wsl"
+        },
+        {
+          "id": "nodejs",
+          "target": "wsl"
+        },
+        {
+          "id": "python",
+          "target": "wsl"
+        },
+        {
+          "id": "rust",
+          "target": "wsl"
+        }
       ],
       "wsl": [
-        { "kind": "enableSystemd" },
-        { "kind": "dockerEngine" },
-        { "kind": "vscodeExtension" }
+        {
+          "kind": "enableSystemd"
+        },
+        {
+          "kind": "dockerEngine"
+        },
+        {
+          "kind": "vscodeExtension"
+        }
+      ],
+      "postinstall": [
+        {
+          "id": "rust-toolchain",
+          "target": "wsl"
+        },
+        {
+          "id": "python-tools",
+          "target": "wsl"
+        },
+        {
+          "id": "dev-folder",
+          "target": "wsl"
+        },
+        {
+          "id": "vscode-extensions",
+          "target": "wsl",
+          "options": [
+            "rust-lang.rust-analyzer",
+            "svelte.svelte-vscode",
+            "bradlc.vscode-tailwindcss",
+            "ms-python.python",
+            "dbaeumer.vscode-eslint",
+            "esbenp.prettier-vscode",
+            "ms-azuretools.vscode-containers",
+            "tamasfe.even-better-toml",
+            "eamodio.gitlens"
+          ]
+        }
       ]
     },
     {
@@ -91,14 +283,30 @@
       "name": "Gaming",
       "description": "Game stores, launchers and mod managers.",
       "apps": [
-        { "id": "steam" },
-        { "id": "epic-games" },
-        { "id": "ea-app" },
-        { "id": "ubisoft-connect" },
-        { "id": "battlenet" },
-        { "id": "curseforge" },
-        { "id": "hydra" },
-        { "id": "google-play-games" }
+        {
+          "id": "steam"
+        },
+        {
+          "id": "epic-games"
+        },
+        {
+          "id": "ea-app"
+        },
+        {
+          "id": "ubisoft-connect"
+        },
+        {
+          "id": "battlenet"
+        },
+        {
+          "id": "curseforge"
+        },
+        {
+          "id": "hydra"
+        },
+        {
+          "id": "google-play-games"
+        }
       ]
     },
     {
@@ -106,14 +314,30 @@
       "name": "Media & chat",
       "description": "Music, streaming and messaging.",
       "apps": [
-        { "id": "spotify" },
-        { "id": "youtube-music" },
-        { "id": "stremio" },
-        { "id": "netflix" },
-        { "id": "prime-video" },
-        { "id": "discord" },
-        { "id": "whatsapp" },
-        { "id": "teams" }
+        {
+          "id": "spotify"
+        },
+        {
+          "id": "youtube-music"
+        },
+        {
+          "id": "stremio"
+        },
+        {
+          "id": "netflix"
+        },
+        {
+          "id": "prime-video"
+        },
+        {
+          "id": "discord"
+        },
+        {
+          "id": "whatsapp"
+        },
+        {
+          "id": "teams"
+        }
       ]
     }
   ]

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::catalog::{Catalog, Target};
 use crate::debloat::DebloatCatalog;
 use crate::error::{Error, Result};
+use crate::postinstall::{self, PostInstallCatalog, PostInstallRequest};
 use crate::runner::{AppRequest, RunRequest, TweakRequest};
 use crate::tweaks::TweakCatalog;
 use crate::wsl::{self, WslAction};
@@ -42,6 +43,8 @@ pub struct Profile {
     /// Debloat item IDs to remove.
     #[serde(default)]
     pub debloat: Vec<String>,
+    #[serde(default)]
+    pub postinstall: Vec<PostInstallRequest>,
 }
 
 /// A profile as the frontend sees it. Mirrored in `src/lib/types.ts` (`ProfileEntry`).
@@ -93,6 +96,7 @@ pub fn builtin(
     catalog: &Catalog,
     tweaks: &TweakCatalog,
     debloat: &DebloatCatalog,
+    post: &PostInstallCatalog,
 ) -> Result<Vec<Profile>> {
     let file: ProfileFile =
         serde_json::from_str(EMBEDDED_PROFILES).map_err(|e| Error::Profile(e.to_string()))?;
@@ -126,6 +130,8 @@ pub fn builtin(
         if let Some(id) = profile.debloat.iter().find(|id| debloat.get(id).is_none()) {
             return Err(invalid(&profile.id, format!("unknown debloat item {id}")));
         }
+        postinstall::check_requests(post, catalog, &profile.postinstall)
+            .map_err(|reason| invalid(&profile.id, reason))?;
     }
     Ok(file.profiles)
 }
@@ -143,6 +149,7 @@ fn selection_of(profile: &Profile) -> RunRequest {
             })
             .collect(),
         debloat: profile.debloat.clone(),
+        postinstall: profile.postinstall.clone(),
     }
 }
 
@@ -161,6 +168,7 @@ impl Profile {
             wsl: selection.wsl,
             tweaks: selection.tweaks.into_iter().map(|t| t.id).collect(),
             debloat: selection.debloat,
+            postinstall: selection.postinstall,
         }
     }
 }
@@ -223,6 +231,7 @@ pub fn sanitize_selection(catalog: &Catalog, selection: &RunRequest) -> (RunRequ
             wsl: actions,
             tweaks,
             debloat,
+            postinstall: postinstall::sanitize_requests(&selection.postinstall),
         },
         unknown,
     )
@@ -339,6 +348,7 @@ impl UserProfiles {
             && selection.wsl.is_empty()
             && selection.tweaks.is_empty()
             && selection.debloat.is_empty()
+            && selection.postinstall.is_empty()
         {
             return Err(Error::Profile("select something to save first".into()));
         }
@@ -452,6 +462,7 @@ mod tests {
             &catalog(),
             &TweakCatalog::load_embedded().unwrap(),
             &DebloatCatalog::load_embedded().unwrap(),
+            &PostInstallCatalog::load_embedded().unwrap(),
         )
         .expect("built-in profiles should be valid");
         assert!(profiles.iter().any(|p| p.id == "dev-on-wsl"));
@@ -465,6 +476,7 @@ mod tests {
             &catalog,
             &TweakCatalog::load_embedded().unwrap(),
             &DebloatCatalog::load_embedded().unwrap(),
+            &PostInstallCatalog::load_embedded().unwrap(),
         )
         .unwrap();
         let mine = profiles.iter().find(|p| p.id == "my-setup").unwrap();

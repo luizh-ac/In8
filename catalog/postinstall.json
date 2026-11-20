@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "git-identity",
+      "name": "Git name and email",
+      "description": "Sets your name and email for commits, and main as the default branch.",
+      "targets": ["host", "wsl"],
+      "requires": "git",
+      "inputs": [
+        { "id": "name", "label": "Name", "kind": "text", "placeholder": "Your Name" },
+        { "id": "email", "label": "Email", "kind": "email", "placeholder": "you@example.com" }
+      ],
+      "actions": [
+        { "type": "command", "program": "git", "args": ["config", "--global", "user.name", "{{name}}"] },
+        { "type": "command", "program": "git", "args": ["config", "--global", "user.email", "{{email}}"] },
+        { "type": "command", "program": "git", "args": ["config", "--global", "init.defaultBranch", "main"] }
+      ]
+    },
+    {
+      "id": "ssh-key",
+      "name": "SSH key",
+      "description": "Creates an ed25519 key in ~/.ssh. A terminal opens so you can type a passphrase; In8 never sees it. An existing key is kept.",
+      "targets": ["host", "wsl"],
+      "inputs": [
+        { "id": "email", "label": "Email (key comment)", "kind": "email", "placeholder": "you@example.com" }
+      ],
+      "actions": [
+        { "type": "sshKey", "comment": "{{email}}" }
+      ]
+    },
+    {
+      "id": "vscode-extensions",
+      "name": "VS Code extensions",
+      "description": "Installs the extensions you pick. With WSL, they go to the WSL side, where your code runs.",
+      "targets": ["host", "wsl"],
+      "requires": "vscode",
+      "options": [
+        { "id": "rust-lang.rust-analyzer", "label": "rust-analyzer" },
+        { "id": "svelte.svelte-vscode", "label": "Svelte" },
+        { "id": "bradlc.vscode-tailwindcss", "label": "Tailwind CSS IntelliSense" },
+        { "id": "ms-python.python", "label": "Python" },
+        { "id": "dbaeumer.vscode-eslint", "label": "ESLint" },
+        { "id": "esbenp.prettier-vscode", "label": "Prettier" },
+        { "id": "ms-azuretools.vscode-containers", "label": "Container Tools (Docker)" },
+        { "id": "tamasfe.even-better-toml", "label": "Even Better TOML" },
+        { "id": "eamodio.gitlens", "label": "GitLens" }
+      ],
+      "actions": [
+        { "type": "vscodeExtensions" }
+      ]
+    },
+    {
+      "id": "rust-toolchain",
+      "name": "Rust toolchain",
+      "description": "Installs the stable Rust toolchain with rustup, plus build-essential (the C linker Rust needs).",
+      "targets": ["wsl"],
+      "requires": "rust",
+      "actions": [
+        { "type": "apt", "packages": ["build-essential"] },
+        { "type": "command", "program": "rustup", "args": ["default", "stable"] }
+      ]
+    },
+    {
+      "id": "python-tools",
+      "name": "Python venv and pip",
+      "description": "Adds python3-venv and pip, which Ubuntu leaves out of python3.",
+      "targets": ["wsl"],
+      "requires": "python",
+      "actions": [
+        { "type": "apt", "packages": ["python3-venv", "python3-pip"] }
+      ]
+    },
+    {
+      "id": "dev-folder",
+      "name": "Projects folder",
+      "description": "Creates a folder for your projects in your home folder.",
+      "targets": ["host", "wsl"],
+      "inputs": [
+        { "id": "path", "label": "Folder", "kind": "folder", "default": "dev" }
+      ],
+      "actions": [
+        { "type": "createDir", "path": "{{path}}" }
+      ]
+    },
+    {
+      "id": "dotfiles",
+      "name": "Dotfiles repository",
+      "description": "Clones your dotfiles repository into your home folder. In8 only clones; it doesn't run anything from it.",
+      "targets": ["host", "wsl"],
+      "requires": "git",
+      "inputs": [
+        { "id": "url", "label": "Repository URL", "kind": "gitUrl", "placeholder": "https://github.com/you/dotfiles.git" },
+        { "id": "folder", "label": "Folder", "kind": "folder", "default": ".dotfiles" }
+      ],
+      "actions": [
+        { "type": "command", "program": "git", "args": ["clone", "--", "{{url}}", "{{folder}}"] }
+      ]
+    }
+  ]
+}

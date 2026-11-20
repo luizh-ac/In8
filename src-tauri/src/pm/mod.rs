@@ -41,6 +41,18 @@ pub enum InstallAction {
     VscodeExtension(String),
     /// Applies or reverts a tweak in-process (registry, power plan, gsettings).
     Tweak(Box<crate::tweaks::TweakJob>),
+    /// A program that may have been installed earlier in the same run (e.g. Git): it's looked up
+    /// when the task runs, not when it's planned.
+    HostTool(Cmd),
+    /// Creates a folder (and its parents) on this machine.
+    CreateDir(std::path::PathBuf),
+    /// `ssh-keygen` in a terminal window, unless the key already exists.
+    SshKey(crate::postinstall::SshKeyJob),
+    /// `code --install-extension` run inside WSL, so the extension lands on the WSL side.
+    VscodeWslExtension {
+        distro: String,
+        extension: String,
+    },
 }
 
 impl InstallAction {
@@ -50,6 +62,12 @@ impl InstallAction {
             Self::Command(cmd) => cmd.display(),
             Self::GithubRelease(package) => github::describe(package),
             Self::VscodeExtension(extension) => format!("code --install-extension {extension}"),
+            Self::HostTool(cmd) => cmd.display(),
+            Self::CreateDir(path) => crate::postinstall::describe_dir(path),
+            Self::SshKey(job) => crate::postinstall::describe_ssh(job),
+            Self::VscodeWslExtension { distro, extension } => {
+                format!("code --install-extension {extension} (inside {distro})")
+            }
         }
     }
 }

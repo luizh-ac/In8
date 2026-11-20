@@ -132,6 +132,7 @@ export interface RunRequest {
   tweaks: TweakRequest[];
   /** Debloat item IDs to remove. */
   debloat: string[];
+  postinstall: PostInstallRequest[];
 }
 
 // runner.rs ("done": a setup step or tweak finished; "removed": a debloat item was uninstalled)
@@ -159,6 +160,7 @@ export interface Profile {
   tweaks: string[];
   /** Debloat item IDs to remove. */
   debloat: string[];
+  postinstall: PostInstallRequest[];
 }
 
 export interface ProfileEntry extends Profile {
@@ -234,4 +236,49 @@ export interface AdminStatus {
   /** "Always run as administrator" is on but UAC was declined at start. */
   declined: boolean;
   canElevate: boolean;
+}
+
+// postinstall.rs
+export type InputKind = "text" | "email" | "gitUrl" | "folder";
+
+export interface PostInput {
+  id: string;
+  label: string;
+  kind: InputKind;
+  default: string;
+  placeholder: string;
+}
+
+export interface PostTask {
+  id: string;
+  name: string;
+  description: string;
+  targets: Target[];
+  /** Catalog app the task needs (installed or selected for the same target). */
+  requires?: string;
+  inputs: PostInput[];
+  /** Things to pick from, e.g. VS Code extensions. */
+  options: { id: string; label: string }[];
+  actions: { type: string }[];
+}
+
+export interface PostInstallRequest {
+  id: string;
+  target: Target;
+  values: Record<string, string>;
+  options: string[];
+}
+
+export interface PostSideState {
+  gitName: string | null;
+  gitEmail: string | null;
+  /** Contents of ~/.ssh/id_ed25519.pub. */
+  sshPublicKey: string | null;
+  /** Installed VS Code extension IDs, lowercase. */
+  extensions: string[];
+}
+
+export interface PostInstallInfo {
+  tasks: PostTask[];
+  state: { host: PostSideState; wsl: PostSideState | null };
 }

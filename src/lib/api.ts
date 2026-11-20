@@ -9,6 +9,7 @@ import type {
   ImportResult,
   OnlineDistro,
   PlatformInfo,
+  PostInstallInfo,
   ProfileEntry,
   RunEvent,
   RunRequest,
@@ -92,6 +93,11 @@ export function getTweaks(): Promise<TweakInfo[]> {
 /** Debloat items with whether they're installed (empty outside Windows). Takes a few seconds. */
 export function getDebloat(): Promise<DebloatInfo[]> {
   return invoke<DebloatInfo[]>("get_debloat");
+}
+
+/** Post-install tasks plus what's already set up. Takes a few seconds (asks Git, VS Code and WSL). */
+export function getPostinstall(): Promise<PostInstallInfo> {
+  return invoke<PostInstallInfo>("get_postinstall");
 }
 
 export function getSettings(): Promise<Settings> {
